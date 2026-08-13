@@ -47,5 +47,12 @@ export default defineConfig({
   // localhost, or a LAN IP) without extra configuration.
   base: './',
   plugins: [react(), injectCsp()],
+  // Version stamp baked in at build/dev-server start and shown in Settings → About.
+  // Version comes from package.json (npm sets it when run through npm scripts);
+  // the date tells deployments apart even if the version wasn't bumped.
+  define: {
+    __APP_VERSION__: JSON.stringify(process.env.npm_package_version ?? 'dev'),
+    __APP_BUILD_DATE__: JSON.stringify(new Date().toISOString().slice(0, 10)),
+  },
   build: { target: 'es2020' },
 });

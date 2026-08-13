@@ -174,7 +174,8 @@ export function SettingsScreen() {
           <div className="field-hint">
             Create one in Google Cloud Console (see README): enable the Drive API, create an OAuth consent
             screen with the drive.file scope, then a "Web application" client. Add this app's URL as an
-            authorized JavaScript origin. No client secret is needed — this app uses Google's popup sign-in.
+            authorized JavaScript origin, and the full page URL as an authorized redirect URI if you use
+            full-page redirect sign-in. No client secret is needed.
           </div>
           <Button variant="secondary" icon="check" onClick={() => void saveClientId()}>
             Save Client ID
@@ -296,6 +297,14 @@ export function SettingsScreen() {
           Localhost caveat: install only works over HTTPS. For testing from your Mac use{' '}
           <code>npm run dev</code> at localhost — on the iPhone, deploy the app (e.g. GitHub Pages) first.
         </div>
+      </section>
+
+      <section className="card settings-section">
+        <h2 className="settings-heading">
+          <Icon paths={[...ICONS.info]} size={18} /> About
+        </h2>
+        <KeyValue label="Version">{__APP_VERSION__}</KeyValue>
+        <KeyValue label="Build date">{__APP_BUILD_DATE__}</KeyValue>
       </section>
 
       {restoreOpen && (

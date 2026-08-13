@@ -45,7 +45,10 @@ The app uses Google's official popup sign-in (Google Identity Services) with the
 4. **APIs & Services → Credentials → Create credentials → OAuth client ID → Web application**.
 5. Under **Authorized JavaScript origins** add:
    - `http://localhost:5173` (for local development)
-   - your deployed URL, e.g. `https://<your-username>.github.io` (see step 3)
+   - your deployed origin, e.g. `https://<your-username>.github.io`
+   Under **Authorized redirect URIs** (needed if you use full-page redirect sign-in) add:
+   - `http://localhost:5173/`
+   - your app's full page URL, e.g. `https://<your-username>.github.io/expense-tracker/` (exact match, including the trailing slash)
 6. Copy the **Client ID** → app **Settings → Google Drive** → paste → Save → **Connect**.
 
 No client secret is needed — the app never asks for one.
@@ -61,7 +64,7 @@ iOS requires **HTTPS** for service workers, the camera, and Google sign-in, so `
    git push -u origin main
    ```
 2. In the repo: **Settings → Pages → Source: GitHub Actions** (a workflow is included in `.github/workflows/deploy-pages.yml`).
-3. Your app is at `https://<you>.github.io/expense-tracker/`. Add that origin to the OAuth client from step 2.
+3. Your app is at `https://<you>.github.io/expense-tracker/`. Add that origin — and, for full-page redirect sign-in, the full page URL as an authorized redirect URI — to the OAuth client from step 2.
 4. **iPhone**: open the URL in Safari → **Share → Add to Home Screen**. Now it behaves like a real app — and installed apps are exempt from iOS's 7-day website-data cleanup.
 
 (Netlify also works: drag the `dist/` folder onto app.netlify.com/drop — no workflow needed. Or run `npm run preview` on your Mac and open `http://<your-mac-ip>:4173` from the phone for basic testing — but without HTTPS the install/SW/camera/GIS pieces won't fully work.)

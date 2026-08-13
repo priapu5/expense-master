@@ -131,7 +131,7 @@ function requestToken(
       prompt,
       ...(hint ? { hint } : {}),
       ...(mode === 'redirect'
-        ? { ux_mode: 'redirect', redirect_uri: window.location.origin }
+        ? { ux_mode: 'redirect', redirect_uri: window.location.origin + window.location.pathname }
         : { ux_mode: 'popup' }),
       callback: (resp: GisTokenResponse) => {
         if (resp.error !== undefined) {
