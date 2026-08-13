@@ -1,4 +1,5 @@
 import { useEffect, type CSSProperties, type ReactNode } from 'react';
+import { createPortal } from 'react-dom';
 import { Icon } from './ui';
 
 export function Modal({
@@ -25,7 +26,9 @@ export function Modal({
 
   const style: CSSProperties | undefined = full ? undefined : { maxWidth };
 
-  return (
+  // Portaled to <body>: callers render modals inside scrolled containers, and
+  // fixed positioning there can be clipped/misplaced (notably on iOS Safari).
+  return createPortal(
     <div
       className={`modal-backdrop${full ? ' modal-backdrop-full' : ''}`}
       onClick={(e) => {
@@ -41,6 +44,7 @@ export function Modal({
         </div>
         <div className="modal-body">{children}</div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
