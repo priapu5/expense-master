@@ -118,7 +118,10 @@ export function DriveProvider({ children }: { children: ReactNode }) {
 
   const connect = useCallback(async () => {
     setStatusMessage('connecting');
-    if (drive.isIosStandalone()) toast('Opening Google sign-in in Safari…', 'info');
+    // Home-screen PWA on iOS: the Safari tab must be opened synchronously,
+    // inside the tap — Safari drops the new-window navigation once this
+    // handler yields (getAccessToken awaits IndexedDB first).
+    if (drive.startManualSignInIfStandalone()) toast('Opening Google sign-in in Safari…', 'info');
     try {
       await drive.getAccessToken(true);
       await reload();

@@ -218,21 +218,43 @@ function startManualSignInSync(clientId: string): void {
   a.remove();
 }
 
+// Safari only honors the target=_blank navigation while the user's tap is
+// still in progress — once the click handler yields (any await), the tab
+// open is silently dropped. So the tab MUST be opened synchronously, by
+// startManualSignInIfStandalone() at the top of Connect, before getAccessToken
+// runs its IndexedDB reads. This flag lets the poller know the tab is up.
+let manualSignInStarted = false;
+
+/** iOS home-screen PWA: open Google's consent page in a Safari tab
+ *  synchronously, inside the user's tap gesture. Returns true when the
+ *  manual Safari-tab flow is in effect, so Connect can show its toast. */
+export function startManualSignInIfStandalone(): boolean {
+  if (!isIosStandalone()) return false;
+  if (manualSignInStarted) return true;
+  if (!cachedClientId) return false; // settings not loaded yet — Connect will surface an error
+  manualSignInStarted = true;
+  startManualSignInSync(cachedClientId);
+  return true;
+}
+
 /** Waits (in the PWA) until the Safari-tab sign-in lands a token in shared
- *  storage; the tab itself runs handleOAuthCodeReturn to do the exchange. */
-async function requestTokenManual(clientId: string): Promise<{ accessToken: string; expiresAt: number }> {
-  startManualSignInSync(clientId);
+ *  storage; the tab itself runs handleOAuthCodeReturn to do the exchange.
+ *  The tab is already open — this only polls and clears the flag. */
+async function requestTokenManual(): Promise<{ accessToken: string; expiresAt: number }> {
   const start = Date.now();
   for (;;) {
     await new Promise((r) => setTimeout(r, 750));
     const tokens = await getDriveTokens();
     if (tokens && tokens.expiresAt - Date.now() > TOKEN_SKEW_MS) {
+      manualSignInStarted = false;
       return { accessToken: tokens.accessToken, expiresAt: tokens.expiresAt };
     }
     if (!localStorage.getItem(PENDING_KEY)) {
+      manualSignInStarted = false;
       throw new DriveError('Google sign-in was cancelled in Safari.', 'auth');
     }
     if (Date.now() - start > 10 * 60_000) {
+      manualSignInStarted = false;
       throw new DriveError('Sign-in in Safari did not complete. Tap Connect to try again.', 'popup');
     }
   }
@@ -402,7 +424,13 @@ export async function getAccessToken(forcePrompt = false): Promise<string> {
         if (!forcePrompt) {
           throw new DriveError('Drive session expired — tap Connect in Settings to sign in again.', 'auth');
         }
-        fresh = await requestTokenManual(clientId);
+        if (!manualSignInStarted) {
+          // The tab can only be opened inside the tap gesture (see
+          // startManualSignInIfStandalone). Never open it here, mid-async —
+          // Safari would silently drop the navigation.
+          throw new DriveError('Could not open Google sign-in in Safari. Tap Connect to try again.', 'popup');
+        }
+        fresh = await requestTokenManual();
       } else {
         const mode = cachedSignInMode ?? (await getSignInMode());
         fresh = await requestToken(clientId, mode, forcePrompt ? 'consent' : '', tokens?.account);
@@ -457,6 +485,9 @@ export async function handleRedirectToken(): Promise<boolean> {
 export async function disconnectDrive(): Promise<void> {
   const tokens = await getDriveTokens();
   await clearDriveTokens();
+  // Cancel any pending Safari-tab sign-in so the next Connect opens fresh.
+  manualSignInStarted = false;
+  localStorage.removeItem(PENDING_KEY);
   if (tokens?.accessToken) {
     try {
       const gis = await loadGis();
