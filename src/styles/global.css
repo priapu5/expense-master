@@ -12,6 +12,9 @@
   --danger: #ff3b30;
   --ok: #248a3d;
   --tabbar-bg: rgba(249, 249, 251, 0.9);
+  /* Opaque match for the tab bar, used to paint the letterbox strip iOS 26
+     reserves below standalone web apps (WebKit bug 313800). */
+  --shell-bg: #f6f6f8;
   --safe-t: env(safe-area-inset-top, 0px);
   --safe-b: env(safe-area-inset-bottom, 0px);
   --safe-l: env(safe-area-inset-left, 0px);
@@ -32,6 +35,7 @@
     --danger: #ff453a;
     --ok: #30d158;
     --tabbar-bg: rgba(20, 20, 22, 0.92);
+    --shell-bg: #141416;
   }
 }
 
@@ -43,6 +47,9 @@ html,
 body {
   margin: 0;
   padding: 0;
+}
+html {
+  background: var(--bg);
 }
 body {
   font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
@@ -73,6 +80,12 @@ img {
   body {
     height: 100dvh;
     overflow: hidden;
+  }
+  /* iOS 26 reserves a strip below standalone web apps that the page can't lay
+     into (WebKit bug 313800). It paints the root background, so make it match
+     the tab bar instead of showing as a black bar. */
+  html {
+    background: var(--shell-bg);
   }
 }
 
@@ -136,6 +149,28 @@ img {
   overscroll-behavior-y: contain;
   -webkit-overflow-scrolling: touch;
   padding: 4px 16px calc(28px + env(safe-area-inset-bottom, 0px));
+}
+
+/* iOS 26 standalone: the web view is already letterboxed inside the status bar
+   and home indicator, yet env() still reports insets (WebKit bug 313800) —
+   honoring them double-insets. Zero them out when the ios26 class is set. */
+html.ios26 .screen-header {
+  padding-top: 10px;
+}
+html.ios26 .toast-host {
+  top: 10px;
+}
+html.ios26 .scroll-pane {
+  padding-bottom: 28px;
+}
+html.ios26 .tabbar {
+  padding-bottom: 0;
+}
+html.ios26 .modal-sheet {
+  padding-bottom: 0;
+}
+html.ios26 .btn-row-sticky {
+  padding-bottom: 10px;
 }
 
 /* ---------- tab bar ---------- */

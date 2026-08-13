@@ -8,6 +8,19 @@ import { AppDataProvider } from './state/AppDataContext';
 import { DriveProvider } from './state/DriveContext';
 import './styles/global.css';
 
+// iOS 26 letterboxes standalone (home-screen) web apps above the status bar
+// and home indicator but still reports env() safe-area insets, so the CSS
+// env()-based paddings would double-inset (WebKit bug 313800). Flag it so the
+// stylesheet can zero them. iOS 27 betas fix the insets themselves.
+if (
+  /iPhone|iPad|iPod/.test(navigator.userAgent) &&
+  /OS 26_/.test(navigator.userAgent) &&
+  ((navigator as { standalone?: boolean }).standalone ||
+    window.matchMedia('(display-mode: standalone)').matches)
+) {
+  document.documentElement.classList.add('ios26');
+}
+
 // Service worker: production builds only (keeps dev/HMR simple).
 // Relative registration so the app works at any sub-path (GitHub Pages etc.).
 if (import.meta.env.PROD && 'serviceWorker' in navigator) {

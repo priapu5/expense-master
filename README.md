@@ -91,6 +91,8 @@ iOS requires **HTTPS** for service workers, the camera, and Google sign-in, so `
 - **`—` instead of an HKD amount** → the currency isn't in the ECB reference set (e.g. TWD) or the device is offline with no cached rate. Original amounts are always kept.
 - **Photos look HEIC on import** → the app re-encodes everything to JPEG; camera capture is preferred over library pick for old iOS versions.
 - **Lost your app data?** → Settings → Google Drive → **Restore from Drive** (a safety snapshot of current data is saved before restoring).
+- **Home screen icon shows a letter (e.g. "E")** → iOS only fetches `apple-touch-icon` over HTTPS; add to Home Screen from your deployed HTTPS URL, not the LAN preview (`http://<your-mac-ip>:4173`). iOS also caches the icon per URL — delete the old home screen icon and add it again after redeploying.
+- **Strip below the tab bar in the installed app (iOS 26)** → WebKit bug [313800](https://bugs.webkit.org/show_bug.cgi?id=313800): iOS 26 letterboxes home-screen web apps above the home indicator and the page cannot draw there. The app paints that strip in the tab bar's color and skips the double-counted safe-area paddings (see `html.ios26` rules in `global.css`); Apple fixes the insets in the iOS 27 betas.
 
 ## Development
 

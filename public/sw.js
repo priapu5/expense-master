@@ -9,7 +9,7 @@
  * Receipt photos never go into Cache Storage (iOS caps it at ~50 MB); they live
  * in IndexedDB and Google Drive.
  */
-const VERSION = 'expense-tracker-v2';
+const VERSION = 'expense-tracker-v3';
 const PRECACHE_URL = './precache-manifest.json';
 
 self.addEventListener('install', (event) => {
