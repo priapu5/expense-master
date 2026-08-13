@@ -5,7 +5,7 @@ import { useToast } from '../../state/ToastContext';
 import { useConfirm } from '../../state/ConfirmContext';
 import { exportAll } from '../../db/repos';
 import { clearFxCache, fxCacheSize } from '../../services/fx';
-import { listBackups, type DriveBackupMeta } from '../../services/drive';
+import { isIosStandalone, listBackups, type DriveBackupMeta } from '../../services/drive';
 import { getStorageInfo, requestPersist, bytesLabel } from '../../lib/storage';
 import { shareOrDownload } from '../../lib/download';
 import { CURRENCIES } from '../../lib/currency';
@@ -181,16 +181,23 @@ export function SettingsScreen() {
             Save Client ID
           </Button>
         </div>
-        <div className="field">
-          <label className="field-label">Sign-in method</label>
-          <Select
-            value={(get<string>('driveSignInMode') ?? 'popup')}
-            onChange={(e) => void set('driveSignInMode', e.target.value)}
-          >
-            <option value="popup">Popup (default)</option>
-            <option value="redirect">Full-page redirect (if popup is blocked)</option>
-          </Select>
-        </div>
+        {isIosStandalone() ? (
+          <div className="field-hint">
+            Home-screen app detected: this can't show Google's sign-in popup, so Connect opens sign-in in a
+            Safari tab. Finish signing in there, then return to the app — it connects automatically.
+          </div>
+        ) : (
+          <div className="field">
+            <label className="field-label">Sign-in method</label>
+            <Select
+              value={(get<string>('driveSignInMode') ?? 'popup')}
+              onChange={(e) => void set('driveSignInMode', e.target.value)}
+            >
+              <option value="popup">Popup (default)</option>
+              <option value="redirect">Full-page redirect (if popup is blocked)</option>
+            </Select>
+          </div>
+        )}
         <KeyValue label="Status">
           <span className={drive.status === 'ready' ? 'tone-pos' : ''}>{driveStatusLabel[drive.status] ?? drive.status}</span>
         </KeyValue>

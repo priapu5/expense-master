@@ -89,6 +89,7 @@ iOS requires **HTTPS** for service workers, the camera, and Google sign-in, so `
 ## Troubleshooting
 
 - **"The Google sign-in popup was blocked"** → Settings → Google Drive → switch sign-in method to **Full-page redirect**.
+- **Sign-in on the iPhone home-screen app** → Connect opens a Safari tab (home-screen apps can't show Google's popup). Finish signing in there, then return to the app — it connects automatically.
 - **429 / "Free-tier rate limit"** while scanning → wait a minute; the free tier allows roughly 1,500 requests/day.
 - **Receipt scanned wrong** → tap the alternative chips, or edit any field; you can also replace the photo later (Edit → Replace photo).
 - **`—` instead of an HKD amount** → the currency isn't in the ECB reference set (e.g. TWD) or the device is offline with no cached rate. Original amounts are always kept.

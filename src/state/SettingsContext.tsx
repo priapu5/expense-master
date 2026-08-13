@@ -15,6 +15,8 @@ interface SettingsCtxValue {
   /** Value merged with defaults. */
   get: <T>(key: string) => T | undefined;
   set: (key: string, value: unknown) => Promise<void>;
+  /** Re-read settings from storage (e.g. a token landed in another tab). */
+  reload: () => Promise<void>;
 }
 
 const SettingsCtx = createContext<SettingsCtxValue>({
@@ -22,6 +24,7 @@ const SettingsCtx = createContext<SettingsCtxValue>({
   loaded: false,
   get: () => undefined,
   set: async () => undefined,
+  reload: async () => undefined,
 });
 
 export function SettingsProvider({ children }: { children: ReactNode }) {
@@ -59,7 +62,13 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
     setSettings((prev) => ({ ...prev, [key]: value }));
   }, []);
 
-  return <SettingsCtx.Provider value={{ settings, loaded, get, set }}>{children}</SettingsCtx.Provider>;
+  const reload = useCallback(async () => {
+    const s = await getSettingsAll().catch(() => ({}));
+    setSettings(s);
+    setLoaded(true);
+  }, []);
+
+  return <SettingsCtx.Provider value={{ settings, loaded, get, set, reload }}>{children}</SettingsCtx.Provider>;
 }
 
 export function useSettings(): SettingsCtxValue {

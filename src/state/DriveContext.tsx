@@ -29,7 +29,7 @@ function errMessage(err: unknown): string {
 }
 
 export function DriveProvider({ children }: { children: ReactNode }) {
-  const { settings, loaded: settingsLoaded, set } = useSettings();
+  const { settings, loaded: settingsLoaded, set, reload } = useSettings();
   const appData = useAppData();
   const { toast } = useToast();
 
@@ -75,6 +75,14 @@ export function DriveProvider({ children }: { children: ReactNode }) {
         if (found) toast('Signed in to Google Drive', 'success');
       })
       .catch(() => undefined);
+    // iOS home-screen flow: the Safari tab lands here with ?code= — exchange
+    // it, save the token, and tell the user to return to the app.
+    drive
+      .handleOAuthCodeReturn()
+      .then((found) => {
+        if (found) toast('Signed in — you can now return to the app', 'success');
+      })
+      .catch(() => undefined);
     // Any record stuck in 'uploading' from a crashed session goes back to 'local'.
     for (const t of appData.transactions) {
       if (t.receipt?.syncState === 'uploading') {
@@ -84,27 +92,52 @@ export function DriveProvider({ children }: { children: ReactNode }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [settingsLoaded]);
 
+  // Prime the sign-in config (and preload Google's script) as soon as settings
+  // load, so Connect has no awaits before it opens the popup — Safari only
+  // allows popups within a direct user gesture.
+  useEffect(() => {
+    if (!settingsLoaded) return;
+    drive.primeSignInConfig(clientId, settings['driveSignInMode'] as 'popup' | 'redirect' | undefined);
+    if (clientId?.trim()) drive.preloadGis();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [settingsLoaded, clientId, settings['driveSignInMode']]);
+
+  // The iOS home-screen flow signs in inside a Safari tab; when the user
+  // comes back to the app, re-read settings so the token saved there shows up.
+  useEffect(() => {
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') void reload();
+    };
+    document.addEventListener('visibilitychange', onVisible);
+    window.addEventListener('focus', onVisible);
+    return () => {
+      document.removeEventListener('visibilitychange', onVisible);
+      window.removeEventListener('focus', onVisible);
+    };
+  }, [reload]);
+
   const connect = useCallback(async () => {
     setStatusMessage('connecting');
+    if (drive.isIosStandalone()) toast('Opening Google sign-in in Safari…', 'info');
     try {
       await drive.getAccessToken(true);
+      await reload();
       setStatusMessage(null);
       toast('Connected to Google Drive', 'success');
       void syncNowInternal();
       void maybeAutoBackup(true);
     } catch (err) {
-      const kind = err instanceof drive.DriveError ? err.kind : 'auth';
-      if (kind === 'popup') {
-        setStatusMessage('error');
-        setLastSyncError(errMessage(err));
-      } else if (kind === 'auth') {
+      // Note: redirect mode normally never reaches here — the page navigates
+      // and handleRedirectToken() completes the flow on reload. The timeout in
+      // requestToken covers the case where the navigation was blocked.
+      if (err instanceof drive.DriveError && err.kind === 'auth') {
         setStatusMessage(null); // user cancelled — stay signed out
-      } else {
-        setStatusMessage('error');
-        setLastSyncError(errMessage(err));
+        return;
       }
-      // Note: redirect mode never reaches here — the page navigates and
-      // handleRedirectToken() completes the flow on reload.
+      if (!(err instanceof drive.DriveError)) console.warn('[drive] connect failed:', err);
+      setStatusMessage('error');
+      setLastSyncError(errMessage(err));
+      toast(errMessage(err), 'error');
     }
   }, [toast]);
 
