@@ -1025,6 +1025,141 @@ html.letterboxed .btn-row-sticky {
 .scan-review {
   padding-bottom: 8px;
 }
+
+/* ---------- bulk scan ---------- */
+.bulk-capture {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 0 8px;
+}
+.bulk-hint {
+  font-size: 13px;
+  color: var(--text2);
+  text-align: center;
+  line-height: 1.5;
+  margin: 0 8px 4px;
+}
+.bulk-shutter {
+  width: 92px;
+  height: 92px;
+  border-radius: 50%;
+  border: none;
+  background: var(--accent);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.18);
+  transition: transform 0.08s ease;
+  margin-top: 8px;
+}
+.bulk-shutter:active {
+  transform: scale(0.94);
+}
+.bulk-shutter:disabled {
+  opacity: 0.4;
+}
+.bulk-shutter-label {
+  font-size: 15px;
+  font-weight: 700;
+}
+.bulk-library {
+  border: none;
+  background: none;
+  color: var(--accent);
+  font-size: 13px;
+  padding: 2px 8px;
+}
+.bulk-library:disabled {
+  opacity: 0.4;
+}
+.bulk-progress {
+  align-self: stretch;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text2);
+  margin: 8px 2px 0;
+}
+.bulk-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-self: stretch;
+}
+.bulk-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px;
+  border-radius: 14px;
+  border: 1px solid var(--border);
+  background: var(--card);
+}
+.bulk-item-saved {
+  opacity: 0.65;
+}
+.bulk-item-thumb {
+  width: 46px;
+  height: 46px;
+  border-radius: 10px;
+  object-fit: cover;
+  flex: none;
+  border: 1px solid var(--border);
+}
+.bulk-item-thumb-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--field-bg);
+  color: var(--text2);
+}
+.bulk-item-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.bulk-item-title {
+  font-size: 14px;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.bulk-item-status {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12.5px;
+  color: var(--text2);
+}
+.bulk-item-status-ok {
+  color: var(--ok);
+}
+.bulk-item-status-err {
+  color: var(--danger);
+}
+.bulk-item-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex: none;
+}
+.bulk-review-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+.bulk-review-count {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text2);
+}
 .warning-banner {
   display: flex;
   align-items: center;

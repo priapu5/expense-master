@@ -12,6 +12,7 @@ No server. No account system. No analytics. No third-party scripts (except Googl
   - Transaction date **plus alternative dates** found on the receipt (fallback: today)
   - **Expense reason** written from the receipt + your project's name/description — *"Camera equipment for shooting footage of the Phuket Trip 2026 travel vlog"* — with alternative phrasings
   - Every field editable before saving; manual entry always available
+- **Bulk scan**: snap receipts back-to-back — each photo is read by Gemini **in the background** (a small concurrent pool, so you never wait between shots) while you keep taking pictures, then confirm them all from one list, one by one
 - **Manual revenue & expenses** with any currency.
 - **Home-currency view (default HKD)**: every amount shows its equivalent in your home currency **at the ECB reference rate of the transaction date**, in lists, totals, and exports.
 - **Google Drive sync**: receipts upload to `ExpenseTracker/<Company>/` in your Drive; automatic JSON backups (debounced), manual backup, restore.
@@ -78,7 +79,7 @@ iOS requires **HTTPS** for service workers, the camera, and Google sign-in, so `
 
 1. **Companies** → add a company (emoji or photo icon).
 2. Open it → **Add project** (give it a helpful description — the AI uses it to write better expense reasons).
-3. Open the project → **Add expense → Scan receipt** → take the photo → review the AI's suggestions (tap chips to pick alternatives) → **Save**.
+3. Open the project → **Add expense → Scan receipt** → take the photo → review the AI's suggestions (tap chips to pick alternatives) → **Save**. For a pile of receipts, use **Add expense → Bulk scan**: tap the shutter for each receipt (Gemini reads them in the background — no waiting between shots), then **Review & confirm** to go through them all at once.
 4. The receipt uploads to your Drive automatically if you're connected (cloud badge on each row shows sync state; **Settings → Sync now** retries).
 5. **Query** tab → set a date range → **Export** → open the XLSX in Numbers/Excel — photos embedded, one row per expense.
 

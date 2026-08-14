@@ -16,6 +16,7 @@ import { Button, EmptyState, ICONS, Icon, SyncBadge } from '../../components/ui'
 import { TxFormModal, TxViewModal } from '../../components/TxModals';
 import { ProjectFormModal } from './CompanyDetailScreen';
 import { ScanFlow } from '../../components/ScanFlow';
+import { BulkScanFlow } from '../../components/BulkScanFlow';
 
 export function ProjectDetailScreen({
   projectId,
@@ -42,6 +43,7 @@ export function ProjectDetailScreen({
   const [revenueForm, setRevenueForm] = useState(false);
   const [expenseForm, setExpenseForm] = useState(false);
   const [scan, setScan] = useState(false);
+  const [bulkScan, setBulkScan] = useState(false);
   const [editProject, setEditProject] = useState(false);
   const [viewTx, setViewTx] = useState<Transaction | null>(null);
 
@@ -72,6 +74,15 @@ export function ProjectDetailScreen({
       return;
     }
     setScan(true);
+  };
+
+  const startBulkScan = () => {
+    if (!apiKey?.trim()) {
+      toast('Add your Gemini API key in Settings first', 'error');
+      onOpenSettings();
+      return;
+    }
+    setBulkScan(true);
   };
 
   const onDeleteProject = async () => {
@@ -168,6 +179,15 @@ export function ProjectDetailScreen({
                 <small>Photo → AI extracts amount, date &amp; reason</small>
               </span>
             </button>
+            <button type="button" className="menu-option" onClick={() => { setAddMenu(null); startBulkScan(); }}>
+              <span className="menu-option-icon">
+                <Icon paths={[...ICONS.layers]} size={24} />
+              </span>
+              <span className="menu-option-text">
+                <strong>Bulk scan</strong>
+                <small>Shoot many receipts — confirm them all at once</small>
+              </span>
+            </button>
             <button type="button" className="menu-option" onClick={() => { setAddMenu(null); setExpenseForm(true); }}>
               <span className="menu-option-icon">
                 <Icon paths={[...ICONS.receipt]} size={24} />
@@ -192,6 +212,17 @@ export function ProjectDetailScreen({
           onClose={() => setScan(false)}
           onManual={() => {
             setScan(false);
+            setExpenseForm(true);
+          }}
+        />
+      )}
+      {bulkScan && company && (
+        <BulkScanFlow
+          company={company}
+          project={project}
+          onClose={() => setBulkScan(false)}
+          onManual={() => {
+            setBulkScan(false);
             setExpenseForm(true);
           }}
         />

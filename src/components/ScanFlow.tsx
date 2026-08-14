@@ -1,7 +1,6 @@
 import { useRef, useState } from 'react';
 import type { Company, Project } from '../types';
 import { blobToArrayBuffer, processImageFile, type ProcessedImage } from '../lib/image';
-import { formatAmount } from '../lib/currency';
 import { todayLocal } from '../lib/date';
 import { extractReceipt, GeminiError, type ReceiptExtraction } from '../services/gemini';
 import { useAppData } from '../state/AppDataContext';
@@ -9,8 +8,8 @@ import { useSettings } from '../state/SettingsContext';
 import { useToast } from '../state/ToastContext';
 import { useDrive } from '../state/DriveContext';
 import { Modal } from './Modal';
-import { Button, Chip, ICONS, Icon, Input, Spinner } from './ui';
-import { CurrencySelect, DateField, Field } from './fields';
+import { Button, ICONS, Icon, Spinner } from './ui';
+import { ReceiptReviewForm } from './ReceiptReviewForm';
 
 type Step = 'pick' | 'processing' | 'extracting' | 'review' | 'error';
 
@@ -136,16 +135,6 @@ export function ScanFlow({
     }
   };
 
-  const amountChips = (extraction?.alternativeAmounts ?? [])
-    .filter((a) => a.amount > 0)
-    .slice(0, 3);
-  const reasonChips = [
-    ...(extraction?.reason ? [extraction.reason] : []),
-    ...(extraction?.reasonAlternatives ?? []),
-  ]
-    .filter((r, i, arr) => r && arr.indexOf(r) === i)
-    .slice(0, 4);
-
   const hasApiKey = Boolean(apiKey.trim());
 
   return (
@@ -248,87 +237,29 @@ export function ScanFlow({
       )}
 
       {step === 'review' && image && (
-        <div className="scan-review">
-          <img src={image.thumbDataUrl} alt="Receipt preview" className="scan-preview-img" />
-
-          <Field label="Amount">
-            <div className="amount-row">
-              <Input
-                type="number"
-                inputMode="decimal"
-                min="0"
-                step="0.01"
-                value={amount}
-                onChange={(e) => setAmount(e.target.value)}
-                placeholder="0.00"
-                autoFocus={!extraction?.totalAmount}
-                aria-label="Amount"
-              />
-              <CurrencySelect value={currency} onChange={setCurrency} />
-            </div>
-            {amountChips.length > 0 && (
-              <div className="chip-row">
-                {amountChips.map((a, i) => (
-                  <Chip
-                    key={`${a.amount}-${i}`}
-                    label={formatAmount(a.amount, a.currency)}
-                    sub={a.label}
-                    active={amount === String(a.amount) && currency === a.currency}
-                    onClick={() => {
-                      setAmount(String(a.amount));
-                      setCurrency(a.currency);
-                    }}
-                  />
-                ))}
-              </div>
-            )}
-            <div className="field-hint">
-              {extraction?.totalAmount != null
-                ? 'Gemini guessed the total above — tap an alternative or edit it.'
-                : 'Gemini could not find a total on this receipt — enter it manually.'}
-            </div>
-          </Field>
-
-          <Field label="Date">
-            <DateField value={date} onChange={setDate} alternatives={extraction?.alternativeDates ?? []} />
-          </Field>
-
-          <Field label="Expense reason">
-            <textarea
-              className="input textarea"
-              rows={3}
-              value={reason}
-              onChange={(e) => setReason(e.target.value)}
-              placeholder={`e.g. Equipment for ${project.name}`}
-            />
-            {reasonChips.length > 0 && (
-              <div className="chip-row">
-                {reasonChips.map((r, i) => (
-                  <Chip key={i} label={r} active={reason === r} onClick={() => setReason(r)} />
-                ))}
-              </div>
-            )}
-          </Field>
-
-          <Field label="Merchant">
-            <Input value={merchant} onChange={(e) => setMerchant(e.target.value)} placeholder="Read from the receipt" />
-          </Field>
-
-          {currency && currency !== home && amount && parseFloat(amount) > 0 && (
-            <div className="fx-preview">
-              Converted to {home} in totals and exports at the {date} ECB rate.
-            </div>
-          )}
-
-          <div className="btn-row btn-row-sticky">
+        <ReceiptReviewForm
+          image={image}
+          extraction={extraction}
+          projectName={project.name}
+          homeCurrency={home}
+          amount={amount}
+          currency={currency}
+          date={date}
+          reason={reason}
+          merchant={merchant}
+          onAmount={setAmount}
+          onCurrency={setCurrency}
+          onDate={setDate}
+          onReason={setReason}
+          onMerchant={setMerchant}
+          saving={saving}
+          onSave={() => void save()}
+          footerLeft={
             <Button variant="secondary" onClick={() => setStep('pick')}>
               Retake
             </Button>
-            <Button variant="primary" icon="check" onClick={() => void save()} disabled={saving}>
-              {saving ? <Spinner size={16} /> : 'Save expense'}
-            </Button>
-          </div>
-        </div>
+          }
+        />
       )}
     </Modal>
   );

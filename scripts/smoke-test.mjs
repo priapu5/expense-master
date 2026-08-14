@@ -2,6 +2,7 @@
 // (system Chrome via puppeteer-core — no browser download).
 // Usage: npm run smoke   (requires `npm run preview` on port 4173)
 import puppeteer from 'puppeteer-core';
+import { writeFileSync } from 'fs';
 
 const BASE = process.env.SMOKE_URL || 'http://localhost:4173/';
 const SHOTS = '/tmp/expense-tracker-shots';
@@ -135,6 +136,72 @@ async function main() {
   await click('button::-p-text(Scan receipt)');
   await page.locator('text=Take photo').wait();
   await shot('10-scan-pick');
+
+  // --- bulk scan: stub Gemini so the whole queue → review pipeline runs ---
+  await page.evaluate(() => {
+    const origFetch = window.fetch;
+    window.fetch = (url, init) => {
+      if (typeof url === 'string' && url.startsWith('https://generativelanguage.googleapis.com/')) {
+        const payload = {
+          candidates: [
+            {
+              content: {
+                parts: [
+                  {
+                    text: JSON.stringify({
+                      totalAmount: 42.5,
+                      currency: 'THB',
+                      alternativeAmounts: [{ amount: 40, currency: 'THB', label: 'Subtotal' }],
+                      transactionDate: '2026-08-01',
+                      alternativeDates: [],
+                      merchant: 'Test Mart',
+                      reason: 'Test purchase for the vlog',
+                      reasonAlternatives: ['Test purchase'],
+                    }),
+                  },
+                ],
+              },
+            },
+          ],
+        };
+        return Promise.resolve(
+          new Response(JSON.stringify(payload), { status: 200, headers: { 'Content-Type': 'application/json' } }),
+        );
+      }
+      return origFetch(url, init);
+    };
+  });
+  await click('button[aria-label="Close"]'); // close the single-scan picker
+  await click('button::-p-text(Add expense)');
+  await click('button::-p-text(Bulk scan)');
+  await page.locator('text=Tap the shutter for each receipt').wait();
+  const png = Buffer.from(
+    'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==',
+    'base64',
+  );
+  writeFileSync('/tmp/bulk-receipt.png', png);
+  await page.waitForSelector('input[type=file][capture]');
+  await (await page.$('input[type=file][capture]')).uploadFile('/tmp/bulk-receipt.png');
+  await page.locator('text=Ready to confirm').wait({ timeout: 15000 });
+  await page.locator('text=Test Mart').wait();
+  await shot('10b-bulk-capture');
+  await click('button::-p-text(Review)');
+  await page.locator('text=Confirm receipts').wait();
+  await page.locator('text=0 of 1 saved').wait({ timeout: 10000 });
+  await shot('10c-bulk-review');
+  // The review editor is seeded from the extraction.
+  await click('button::-p-text(Confirm)');
+  await page.locator('input[aria-label="Amount"]').wait();
+  const amt = await page.$eval('input[aria-label="Amount"]', (el) => el.value);
+  if (amt !== '42.5') throw new Error('expected seeded amount 42.5, got ' + amt);
+  await shot('10d-bulk-editor');
+  await click('button::-p-text(Back to list)');
+  // Closing with an unsaved receipt asks for confirmation.
+  await click('button[aria-label="Close"]');
+  await page.locator('text=Close bulk scan?').wait();
+  await click('button::-p-text(Close anyway)');
+  await page.waitForFunction(() => !document.body.innerText.includes('Bulk scan'), { timeout: 10000 });
+  console.log('✓ bulk scan queue → review → editor → discard flow works');
 
   // --- service worker registration ---
   const sw = await page.evaluate(async () => {
