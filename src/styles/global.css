@@ -328,6 +328,19 @@ html.ios26 .btn-row-sticky {
   margin-top: 6px;
   line-height: 1.45;
 }
+.redirect-uri {
+  display: inline-block;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 12.5px;
+  background: var(--field-bg);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 10px 12px;
+  color: var(--text);
+  word-break: break-all;
+  flex: 1;
+  min-width: 0;
+}
 .amount-row {
   display: flex;
   gap: 8px;

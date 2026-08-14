@@ -88,6 +88,7 @@ iOS requires **HTTPS** for service workers, the camera, and Google sign-in, so `
 
 ## Troubleshooting
 
+- **"Access blocked … Error 400: redirect_uri_mismatch"** when signing in → the redirect URI the app sent isn't registered on your OAuth client. Copy the **Authorized redirect URI** shown in **Settings → Google Drive** and paste it into Google Cloud Console → your Web application client → **Authorized redirect URIs** (exact match, including the trailing slash — Google requires the scheme, host, and trailing slash to match exactly). This is always required for the full-page redirect and iOS home-screen flows; popup sign-in only needs the authorized JavaScript origin.
 - **"The Google sign-in popup was blocked"** → Settings → Google Drive → switch sign-in method to **Full-page redirect**.
 - **Sign-in on the iPhone home-screen app** → Connect opens a Safari tab (home-screen apps can't show Google's popup). Finish signing in there, then return to the app — it connects automatically.
 - **429 / "Free-tier rate limit"** while scanning → wait a minute; the free tier allows roughly 1,500 requests/day.

@@ -5,7 +5,7 @@ import { useToast } from '../../state/ToastContext';
 import { useConfirm } from '../../state/ConfirmContext';
 import { exportAll } from '../../db/repos';
 import { clearFxCache, fxCacheSize } from '../../services/fx';
-import { isIosStandalone, listBackups, type DriveBackupMeta } from '../../services/drive';
+import { getRedirectUri, isIosStandalone, listBackups, type DriveBackupMeta } from '../../services/drive';
 import { getStorageInfo, requestPersist, bytesLabel } from '../../lib/storage';
 import { shareOrDownload } from '../../lib/download';
 import { CURRENCIES } from '../../lib/currency';
@@ -45,6 +45,24 @@ export function SettingsScreen() {
   const saveClientId = async () => {
     await set('driveClientId', clientId.trim());
     toast('Google OAuth Client ID saved', 'success');
+  };
+
+  const copyRedirectUri = async () => {
+    const uri = getRedirectUri();
+    try {
+      await navigator.clipboard.writeText(uri);
+    } catch {
+      // iOS Safari needs the execCommand fallback outside secure contexts.
+      const ta = document.createElement('textarea');
+      ta.value = uri;
+      ta.style.position = 'fixed';
+      ta.style.opacity = '0';
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand('copy');
+      ta.remove();
+    }
+    toast('Redirect URI copied', 'success');
   };
 
   const onRestore = async (b: DriveBackupMeta) => {
@@ -198,6 +216,21 @@ export function SettingsScreen() {
             </Select>
           </div>
         )}
+        <div className="field">
+          <label className="field-label">Authorized redirect URI</label>
+          <div className="field-hint">
+            Google rejects sign-in with <b>Error 400: redirect_uri_mismatch</b> unless this exact URL
+            (trailing slash included) is listed under the OAuth client's <b>Authorized redirect URIs</b> in
+            Google Cloud Console → Credentials → your Web application client. Popup sign-in only needs the
+            JavaScript origin; the full-page redirect and iOS home-screen flows always send this URL.
+          </div>
+          <div className="btn-row">
+            <code className="redirect-uri">{getRedirectUri()}</code>
+            <Button variant="secondary" icon="copy" onClick={() => void copyRedirectUri()}>
+              Copy
+            </Button>
+          </div>
+        </div>
         <KeyValue label="Status">
           <span className={drive.status === 'ready' ? 'tone-pos' : ''}>{driveStatusLabel[drive.status] ?? drive.status}</span>
         </KeyValue>

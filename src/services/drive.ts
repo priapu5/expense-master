@@ -158,6 +158,14 @@ export function isIosStandalone(): boolean {
   return isIos() && (navigator as { standalone?: boolean }).standalone === true;
 }
 
+/** The exact redirect URI this page sends to Google. It must be registered
+ *  verbatim (scheme, host, path, and trailing slash) under the OAuth client's
+ *  "Authorized redirect URIs" or Google rejects the request with
+ *  "Error 400: redirect_uri_mismatch". */
+export function getRedirectUri(): string {
+  return window.location.origin + window.location.pathname;
+}
+
 function randomBase64Url(bytes: number): string {
   const buf = new Uint8Array(bytes);
   crypto.getRandomValues(buf);
@@ -188,7 +196,7 @@ async function refillChallengePool(): Promise<void> {
 /** Opens Google's consent page in a Safari tab and stores the PKCE verifier.
  *  localStorage is synchronous, so the whole click path stays in-gesture. */
 function startManualSignInSync(clientId: string): void {
-  const redirectUri = window.location.origin + window.location.pathname;
+  const redirectUri = getRedirectUri();
   const pair = challengePool.shift();
   void refillChallengePool();
   const verifier = pair?.verifier ?? randomBase64Url(64);
@@ -353,9 +361,7 @@ function requestToken(
       scope: SCOPE,
       prompt,
       ...(hint ? { hint } : {}),
-      ...(mode === 'redirect'
-        ? { ux_mode: 'redirect', redirect_uri: window.location.origin + window.location.pathname }
-        : { ux_mode: 'popup' }),
+      ...(mode === 'redirect' ? { ux_mode: 'redirect', redirect_uri: getRedirectUri() } : { ux_mode: 'popup' }),
       callback: (resp: GisTokenResponse) => {
         window.clearTimeout(timer);
         if (resp.error !== undefined) {
