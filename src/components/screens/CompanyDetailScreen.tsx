@@ -2,6 +2,8 @@ import { useMemo, useState } from 'react';
 import type { Project } from '../../types';
 import { formatAmount } from '../../lib/currency';
 import { totalsByCurrency } from '../../lib/totals';
+import { round2 } from '../../lib/totals';
+import { ALL_KEY, useHomeTotalsByKey } from '../../hooks/useHomeTotalsByKey';
 import { useAppData } from '../../state/AppDataContext';
 import { useSettings } from '../../state/SettingsContext';
 import { useConfirm } from '../../state/ConfirmContext';
@@ -43,9 +45,11 @@ export function CompanyDetailScreen({
     );
   }
 
-  const byCur = totalsByCurrency(txs);
-  const expenseTotal = [...byCur.values()].reduce((s, v) => s + v.expense, 0);
-  const revenueTotal = [...byCur.values()].reduce((s, v) => s + v.revenue, 0);
+  // Home-currency totals converted at each transaction's date rate (same logic
+  // as the TotalsCard below) — never a raw sum across currencies.
+  const { byKey: homeByKey, loading: homeLoading } = useHomeTotalsByKey(txs, ALL_KEY, home);
+  const h = homeByKey.get('all');
+  const net = h ? round2(h.revenue - h.expense) : null;
 
   const onDeleteCompany = async () => {
     const ok = await confirm({
@@ -82,13 +86,23 @@ export function CompanyDetailScreen({
     >
       <TotalsStrip
         lines={[
-          { label: 'Revenue', value: formatAmount(revenueTotal, home, 0), sub: home, tone: 'pos' },
-          { label: 'Expense', value: formatAmount(expenseTotal, home, 0), sub: home, tone: 'neg' },
+          {
+            label: 'Revenue',
+            value: homeLoading ? '…' : h ? formatAmount(h.revenue, home, 0) : '—',
+            sub: `≈ ${home}`,
+            tone: 'pos',
+          },
+          {
+            label: 'Expense',
+            value: homeLoading ? '…' : h ? formatAmount(h.expense, home, 0) : '—',
+            sub: `≈ ${home}`,
+            tone: 'neg',
+          },
           {
             label: 'Net',
-            value: formatAmount(Math.abs(revenueTotal - expenseTotal), home, 0) + (revenueTotal - expenseTotal < 0 ? ' −' : ''),
-            sub: home,
-            tone: revenueTotal - expenseTotal >= 0 ? 'pos' : 'neg',
+            value: homeLoading ? '…' : net == null ? '—' : `${formatAmount(Math.abs(net), home, 0)}${net < 0 ? ' −' : ''}`,
+            sub: `≈ ${home}`,
+            tone: net == null ? 'neutral' : net >= 0 ? 'pos' : 'neg',
           },
         ]}
       />
