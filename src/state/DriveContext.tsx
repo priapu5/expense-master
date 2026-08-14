@@ -135,6 +135,7 @@ export function DriveProvider({ children }: { children: ReactNode }) {
       // requestToken covers the case where the navigation was blocked.
       if (err instanceof drive.DriveError && err.kind === 'auth') {
         setStatusMessage(null); // user cancelled — stay signed out
+        toast(errMessage(err), 'info');
         return;
       }
       if (!(err instanceof drive.DriveError)) console.warn('[drive] connect failed:', err);

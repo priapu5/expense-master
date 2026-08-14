@@ -290,7 +290,7 @@ async function requestTokenManual(): Promise<{ accessToken: string; expiresAt: n
       manualSignInStarted = false;
       throw new DriveError('Google sign-in was cancelled in Safari.', 'auth');
     }
-    if (Date.now() - start > 10 * 60_000) {
+    if (Date.now() - start > 5 * 60_000) {
       manualSignInStarted = false;
       throw new DriveError('Sign-in in Safari did not complete. Tap Connect to try again.', 'popup');
     }
