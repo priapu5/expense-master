@@ -153,17 +153,15 @@ img {
   padding: 4px 16px calc(28px + env(safe-area-inset-bottom, 0px));
 }
 
-/* Letterboxed standalone (iOS 26+, WebKit bug 313800): the web view is already
-   inset above the status bar and home indicator, yet env() still reports
-   insets — honoring them double-insets. Zero them out while the `letterboxed`
-   class (set geometrically in main.tsx) is present; it is removed again when
-   the home indicator auto-hides and the app genuinely spans the full screen. */
-html.letterboxed .screen-header {
-  padding-top: 10px;
-}
-html.letterboxed .toast-host {
-  top: 10px;
-}
+/* Letterboxed standalone (iOS 26+, WebKit bug 313800 — measured on iOS 18.7
+   too): the web view is missing the status-bar delta at the BOTTOM, leaving an
+   orphan strip below the viewport that the page cannot lay out into. The home
+   indicator therefore sits OUTSIDE the viewport, so env(safe-area-inset-
+   bottom) is double-counted — zero those paddings while the `letterboxed`
+   class (set geometrically in main.tsx) is present. The top is NOT letterboxed:
+   the status bar stays overlaid, so env(safe-area-inset-top) is honored and the
+   header keeps clearing the dynamic island. The class is removed again when the
+   home indicator auto-hides and the app genuinely spans the full screen. */
 html.letterboxed .scroll-pane {
   padding-bottom: 28px;
 }

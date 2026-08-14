@@ -8,15 +8,18 @@ import { AppDataProvider } from './state/AppDataContext';
 import { DriveProvider } from './state/DriveContext';
 import './styles/global.css';
 
-// iOS 26+ letterboxes standalone (home-screen) web apps: the layout viewport
-// is shorter than the physical screen by the status-bar delta, leaving an
-// orphan strip at the bottom that the page cannot lay out into (WebKit bug
-// 313800 — still open on iOS 26.x and early iOS 27 betas). env() safe-area
-// insets are still reported inside the already-inset viewport, so honoring
-// them double-insets. Detect the letterbox geometrically (visualViewport vs
-// screen height) instead of sniffing the OS version: it covers iOS 26, iOS 27
-// betas, and iPads, and re-toggles as the home indicator shows/hides (a swipe
-// can collapse the strip, making the app full-screen until relaunch).
+// iOS letterboxes standalone (home-screen) web apps: the layout viewport is
+// shorter than the physical screen by the status-bar delta, leaving an orphan
+// strip at the BOTTOM that the page cannot lay out into (WebKit bug 313800 —
+// measured on iOS 18.7 and still open on iOS 26.x / early iOS 27 betas). The
+// home indicator sits outside the viewport, so env(safe-area-inset-bottom) is
+// double-counted and the CSS zeroes those paddings (see html.letterboxed rules
+// in global.css). The top is NOT letterboxed — the status bar stays overlaid,
+// so env(safe-area-inset-top) remains honored. Detect the letterbox
+// geometrically (visualViewport vs screen height) instead of sniffing the OS
+// version: it covers iOS 18, iOS 26, iOS 27 betas, and iPads, and re-toggles
+// as the home indicator shows/hides (a swipe can collapse the strip, making
+// the app full-screen until relaunch).
 const LETTERBOX_GAP = 24; // px of viewport missing from the bottom that signals a letterbox
 
 function isStandalone(): boolean {
