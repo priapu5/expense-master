@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useSettings } from '../../state/SettingsContext';
 import { useDrive } from '../../state/DriveContext';
 import { useToast } from '../../state/ToastContext';
@@ -36,6 +36,23 @@ export function SettingsScreen() {
   });
   const [fxCount, setFxCount] = useState(0);
   const [restoreOpen, setRestoreOpen] = useState(false);
+  const [diagOpen, setDiagOpen] = useState(false);
+  const diagTimer = useRef<number | null>(null);
+
+  // Hidden geometry diagnostic: press-and-hold (or long-press on iOS) the
+  // version line in About. Reports display-mode, viewport vs screen geometry,
+  // safe-area insets, and where the app shell actually sits — enough to tell
+  // Safari-chrome issues from standalone layout quirks on a given device.
+  const startDiagTimer = () => {
+    cancelDiagTimer();
+    diagTimer.current = window.setTimeout(() => setDiagOpen(true), 600);
+  };
+  const cancelDiagTimer = () => {
+    if (diagTimer.current != null) {
+      window.clearTimeout(diagTimer.current);
+      diagTimer.current = null;
+    }
+  };
 
   useEffect(() => {
     getStorageInfo().then(setStorage).catch(() => undefined);
@@ -338,10 +355,24 @@ export function SettingsScreen() {
           <Icon paths={[...ICONS.info]} size={18} /> About
         </h2>
         <KeyValue label="Version">
-          {__APP_VERSION__} <span className="muted">({__APP_COMMIT__})</span>
+          <span
+            className="diag-trigger"
+            onPointerDown={startDiagTimer}
+            onPointerUp={cancelDiagTimer}
+            onPointerLeave={cancelDiagTimer}
+            onPointerCancel={cancelDiagTimer}
+            onContextMenu={(e) => {
+              e.preventDefault();
+              setDiagOpen(true);
+            }}
+          >
+            {__APP_VERSION__} <span className="muted">({__APP_COMMIT__})</span>
+          </span>
         </KeyValue>
         <KeyValue label="Build date">{__APP_BUILD_DATE__}</KeyValue>
       </section>
+
+      {diagOpen && <GeometryDiagnosticModal onClose={() => setDiagOpen(false)} />}
 
       {restoreOpen && (
         <RestoreModal
@@ -350,6 +381,62 @@ export function SettingsScreen() {
         />
       )}
     </Screen>
+  );
+}
+
+function GeometryDiagnosticModal({ onClose }: { onClose: () => void }) {
+  const [info, setInfo] = useState<[string, string][] | null>(null);
+
+  useEffect(() => {
+    const vv = window.visualViewport;
+    const cs = getComputedStyle(document.documentElement);
+    const app = document.querySelector('.app');
+    const tabbar = document.querySelector('.tabbar');
+    const appRect = app?.getBoundingClientRect();
+    const tabRect = tabbar?.getBoundingClientRect();
+    const rows: [string, string][] = [
+      ['display-mode',
+        window.matchMedia('(display-mode: standalone)').matches
+          ? 'standalone'
+          : window.matchMedia('(display-mode: fullscreen)').matches
+            ? 'fullscreen'
+            : 'browser'],
+      ['navigator.standalone', String((navigator as { standalone?: boolean }).standalone ?? false)],
+      ['window.innerHeight', String(Math.round(window.innerHeight))],
+      ['screen.height', String(Math.round(window.screen.height))],
+      ['visualViewport.height', vv ? String(Math.round(vv.height)) : 'n/a'],
+      ['visualViewport.offsetTop', vv ? String(Math.round(vv.offsetTop)) : 'n/a'],
+      ['missing viewport gap', vv ? String(Math.round(window.screen.height - vv.height - vv.offsetTop)) : 'n/a'],
+      ['safe-area-inset-top', cs.getPropertyValue('--safe-t')],
+      ['safe-area-inset-bottom', cs.getPropertyValue('--safe-b')],
+      ['letterboxed class', document.documentElement.classList.contains('letterboxed') ? 'yes' : 'no'],
+      ['app bottom gap', appRect == null ? 'n/a' : `${Math.round(window.innerHeight - appRect.bottom)}px`],
+      ['tabbar bottom gap', tabRect == null ? 'n/a' : `${Math.round(window.innerHeight - tabRect.bottom)}px`],
+      ['tabbar height', tabRect ? `${Math.round(tabRect.height)}px` : 'n/a'],
+      ['color scheme', window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'],
+      ['user agent', navigator.userAgent],
+    ];
+    setInfo(rows);
+  }, []);
+
+  return (
+    <Modal title="Geometry diagnostic" onClose={onClose}>
+      <div className="kv-list">
+        {info ? (
+          info.map(([k, v]) => (
+            <KeyValue key={k} label={k}>
+              <span className="diag-value">{v}</span>
+            </KeyValue>
+          ))
+        ) : (
+          <Spinner size={22} />
+        )}
+      </div>
+      <div className="settings-note">
+        Press-and-hold the version again to refresh. If the shell is short of the bottom, "app bottom gap" is
+        greater than 0.
+      </div>
+    </Modal>
   );
 }
 

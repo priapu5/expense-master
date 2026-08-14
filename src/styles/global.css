@@ -12,7 +12,7 @@
   --danger: #ff3b30;
   --ok: #248a3d;
   --tabbar-bg: rgba(249, 249, 251, 0.9);
-  /* Opaque match for the tab bar, used to paint the letterbox strip iOS 26
+  /* Opaque match for the tab bar, used to paint the letterbox strip iOS 26+
      reserves below standalone web apps (WebKit bug 313800). */
   --shell-bg: #f6f6f8;
   --safe-t: env(safe-area-inset-top, 0px);
@@ -81,10 +81,12 @@ img {
     height: 100dvh;
     overflow: hidden;
   }
-  /* iOS 26 reserves a strip below standalone web apps that the page can't lay
-     into (WebKit bug 313800). It paints the root background, so make it match
-     the tab bar instead of showing as a black bar. */
-  html {
+  /* iOS 26+ reserves a strip below standalone web apps that the page can't lay
+     into (WebKit bug 313800). iOS paints that strip from the root background
+     (which one it samples varies by OS version), so paint both html and body
+     in the tab-bar color instead of showing default black. */
+  html,
+  body {
     background: var(--shell-bg);
   }
 }
@@ -151,25 +153,27 @@ img {
   padding: 4px 16px calc(28px + env(safe-area-inset-bottom, 0px));
 }
 
-/* iOS 26 standalone: the web view is already letterboxed inside the status bar
-   and home indicator, yet env() still reports insets (WebKit bug 313800) —
-   honoring them double-insets. Zero them out when the ios26 class is set. */
-html.ios26 .screen-header {
+/* Letterboxed standalone (iOS 26+, WebKit bug 313800): the web view is already
+   inset above the status bar and home indicator, yet env() still reports
+   insets — honoring them double-insets. Zero them out while the `letterboxed`
+   class (set geometrically in main.tsx) is present; it is removed again when
+   the home indicator auto-hides and the app genuinely spans the full screen. */
+html.letterboxed .screen-header {
   padding-top: 10px;
 }
-html.ios26 .toast-host {
+html.letterboxed .toast-host {
   top: 10px;
 }
-html.ios26 .scroll-pane {
+html.letterboxed .scroll-pane {
   padding-bottom: 28px;
 }
-html.ios26 .tabbar {
+html.letterboxed .tabbar {
   padding-bottom: 0;
 }
-html.ios26 .modal-sheet {
+html.letterboxed .modal-sheet {
   padding-bottom: 0;
 }
-html.ios26 .btn-row-sticky {
+html.letterboxed .btn-row-sticky {
   padding-bottom: 10px;
 }
 
@@ -1153,4 +1157,17 @@ html.ios26 .btn-row-sticky {
   color: var(--text2);
   line-height: 1.55;
   margin-top: 10px;
+}
+
+/* ---------- hidden geometry diagnostic ---------- */
+.diag-trigger {
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+  cursor: default;
+}
+.diag-value {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12px;
+  word-break: break-all;
 }
