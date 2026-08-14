@@ -101,6 +101,14 @@ export async function getDriveClientId(): Promise<string | undefined> {
   return getSetting<string>('driveClientId');
 }
 
+// Only needed for "Web application" OAuth clients — Google requires their
+// secret at the code exchange ("invalid_request" otherwise). A public client
+// ("Single-page application" type) needs none. Stored on-device; never
+// commit it to source.
+export async function getDriveClientSecret(): Promise<string | undefined> {
+  return getSetting<string>('driveClientSecret');
+}
+
 export async function getDriveTokens(): Promise<DriveTokens | undefined> {
   return getSetting<DriveTokens>('driveTokens');
 }
@@ -402,6 +410,7 @@ export async function handleOAuthCodeReturn(): Promise<boolean> {
   logSignIn('code received, exchanging');
   const pending = JSON.parse(rawPending) as PendingCode;
   try {
+    const secret = await getDriveClientSecret();
     const body = new URLSearchParams({
       code,
       client_id: pending.clientId,
@@ -409,6 +418,7 @@ export async function handleOAuthCodeReturn(): Promise<boolean> {
       grant_type: 'authorization_code',
       redirect_uri: pending.redirectUri,
     });
+    if (secret) body.set('client_secret', secret);
     const res = await fetch('https://oauth2.googleapis.com/token', {
       method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
@@ -422,7 +432,7 @@ export async function handleOAuthCodeReturn(): Promise<boolean> {
     if (!res.ok || !data?.access_token) {
       const hint =
         data?.error === 'invalid_request'
-          ? ' This usually means the OAuth client is a "Web application" type, which requires a client secret the app never sends. Create a "Single-page application" client in Google Cloud Console (Credentials → Create credentials → OAuth client ID) and paste its Client ID in Settings instead.'
+          ? ' This usually means the OAuth client is a "Web application" type, which requires a client secret at the code exchange. Paste the client secret in Settings → Google Drive → Save, then Connect again — or create a "Single-page application" client (no secret needed).'
           : '';
       throw new DriveError(
         `${data?.error ? `Google sign-in failed (${data.error}).` : `Google sign-in failed (${res.status}).`}${hint}`,

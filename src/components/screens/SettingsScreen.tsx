@@ -30,6 +30,7 @@ export function SettingsScreen() {
   const [showKey, setShowKey] = useState(false);
   const [model, setModel] = useState(get<string>('geminiModel') ?? 'gemini-2.5-flash');
   const [clientId, setClientId] = useState((get<string>('driveClientId') ?? ''));
+  const [clientSecret, setClientSecret] = useState((get<string>('driveClientSecret') ?? ''));
   const [storage, setStorage] = useState<{ usage: number | null; quota: number | null; persisted: boolean | null }>({
     usage: null,
     quota: null,
@@ -53,6 +54,7 @@ export function SettingsScreen() {
 
   const saveClientId = async () => {
     await set('driveClientId', clientId.trim());
+    await set('driveClientSecret', clientSecret.trim() || undefined);
     toast('Google OAuth Client ID saved', 'success');
   };
 
@@ -201,11 +203,29 @@ export function SettingsScreen() {
           <div className="field-hint">
             Create one in Google Cloud Console (see README): enable the Drive API, create an OAuth consent
             screen with the drive.file scope, then a "Web application" client. Add this app's URL as an
-            authorized JavaScript origin, and the full page URL as an authorized redirect URI if you use
-            full-page redirect sign-in. No client secret is needed.
+            authorized JavaScript origin, and the full page URL as an authorized redirect URI (with the
+            trailing slash) — it's shown below. The iOS home-screen flow always exchanges the code with
+            Google, and Google requires this client's secret for that exchange.
+          </div>
+          <label className="field-label" style={{ marginTop: 10 }}>
+            Client secret (required for "Web application" clients)
+          </label>
+          <Input
+            type="password"
+            value={clientSecret}
+            onChange={(e) => setClientSecret(e.target.value)}
+            placeholder="GOCSPX-…"
+            autoComplete="off"
+          />
+          <div className="field-hint">
+            Google refuses the code exchange for a "Web application" client without its secret (error
+            <b> invalid_request</b>). This app is client-side, so the secret lives in your device's storage
+            and is sent to Google from the browser — acceptable for a private personal app, but never make
+            the app source or this client public. A "Single-page application" client would need no secret at
+            all; if your console offers that type, prefer it and leave this empty.
           </div>
           <Button variant="secondary" icon="check" onClick={() => void saveClientId()}>
-            Save Client ID
+            Save Client ID &amp; secret
           </Button>
         </div>
         {isIosStandalone() ? (
