@@ -6,11 +6,9 @@ import { useConfirm } from '../../state/ConfirmContext';
 import { exportAll } from '../../db/repos';
 import { clearFxCache, fxCacheSize } from '../../services/fx';
 import {
-  clearSignInDebugLog,
-  getRedirectUri,
-  getSignInDebugLog,
   isIosStandalone,
   listBackups,
+  parseClientSecretsJson,
   type DriveBackupMeta,
 } from '../../services/drive';
 import { getStorageInfo, requestPersist, bytesLabel } from '../../lib/storage';
@@ -18,7 +16,7 @@ import { shareOrDownload } from '../../lib/download';
 import { CURRENCIES } from '../../lib/currency';
 import { Screen } from '../../components/layout';
 import { Modal } from '../../components/Modal';
-import { Button, ICONS, Icon, Input, KeyValue, Select, Spinner } from '../../components/ui';
+import { Button, ICONS, Icon, Input, KeyValue, Select, Spinner, TextArea } from '../../components/ui';
 
 export function SettingsScreen() {
   const { get, set } = useSettings();
@@ -30,7 +28,7 @@ export function SettingsScreen() {
   const [showKey, setShowKey] = useState(false);
   const [model, setModel] = useState(get<string>('geminiModel') ?? 'gemini-2.5-flash');
   const [clientId, setClientId] = useState((get<string>('driveClientId') ?? ''));
-  const [clientSecret, setClientSecret] = useState((get<string>('driveClientSecret') ?? ''));
+  const [credentialsJson, setCredentialsJson] = useState((get<string>('driveCredentialsJson') ?? ''));
   const [storage, setStorage] = useState<{ usage: number | null; quota: number | null; persisted: boolean | null }>({
     usage: null,
     quota: null,
@@ -38,8 +36,6 @@ export function SettingsScreen() {
   });
   const [fxCount, setFxCount] = useState(0);
   const [restoreOpen, setRestoreOpen] = useState(false);
-  const [showSignInLog, setShowSignInLog] = useState(false);
-  const [signInLog, setSignInLog] = useState<string[]>([]);
 
   useEffect(() => {
     getStorageInfo().then(setStorage).catch(() => undefined);
@@ -52,28 +48,20 @@ export function SettingsScreen() {
     toast('Gemini settings saved', 'success');
   };
 
-  const saveClientId = async () => {
-    await set('driveClientId', clientId.trim());
-    await set('driveClientSecret', clientSecret.trim() || undefined);
-    toast('Google OAuth Client ID saved', 'success');
-  };
-
-  const copyRedirectUri = async () => {
-    const uri = getRedirectUri();
-    try {
-      await navigator.clipboard.writeText(uri);
-    } catch {
-      // iOS Safari needs the execCommand fallback outside secure contexts.
-      const ta = document.createElement('textarea');
-      ta.value = uri;
-      ta.style.position = 'fixed';
-      ta.style.opacity = '0';
-      document.body.appendChild(ta);
-      ta.select();
-      document.execCommand('copy');
-      ta.remove();
+  const saveCredentials = async () => {
+    const parsed = parseClientSecretsJson(credentialsJson);
+    if (!parsed) {
+      toast(
+        'That doesn\u2019t look like a Google client-secrets file — it should contain a client_id under \"web\" (or \"installed\").',
+        'error',
+      );
+      return;
     }
-    toast('Redirect URI copied', 'success');
+    await set('driveCredentialsJson', credentialsJson.trim());
+    await set('driveClientId', parsed.clientId);
+    await set('driveClientSecret', parsed.clientSecret);
+    setClientId(parsed.clientId);
+    toast('Google Drive credentials saved', 'success');
   };
 
   const onRestore = async (b: DriveBackupMeta) => {
@@ -104,7 +92,7 @@ export function SettingsScreen() {
   };
 
   const driveStatusLabel: Record<string, string> = {
-    unconfigured: 'Not configured — add your Google OAuth Client ID below',
+    unconfigured: 'Not configured — add your Google OAuth credentials below',
     signedOut: 'Configured, but not signed in',
     connecting: 'Connecting…',
     ready: drive.account ? `Connected as ${drive.account}` : 'Connected',
@@ -198,40 +186,32 @@ export function SettingsScreen() {
           <Icon paths={[...ICONS.drive]} size={18} /> Google Drive
         </h2>
         <div className="field">
-          <label className="field-label">Google OAuth Client ID (web application)</label>
-          <Input value={clientId} onChange={(e) => setClientId(e.target.value)} placeholder="1234567890-xxxx.apps.googleusercontent.com" autoComplete="off" />
-          <div className="field-hint">
-            Create one in Google Cloud Console (see README): enable the Drive API, create an OAuth consent
-            screen with the drive.file scope, then a "Web application" client. Add this app's URL as an
-            authorized JavaScript origin, and the full page URL as an authorized redirect URI (with the
-            trailing slash) — it's shown below. The iOS home-screen flow always exchanges the code with
-            Google, and Google requires this client's secret for that exchange.
-          </div>
-          <label className="field-label" style={{ marginTop: 10 }}>
-            Client secret (required for "Web application" clients)
-          </label>
-          <Input
-            type="password"
-            value={clientSecret}
-            onChange={(e) => setClientSecret(e.target.value)}
-            placeholder="GOCSPX-…"
+          <label className="field-label">Google OAuth credentials</label>
+          <TextArea
+            rows={5}
+            value={credentialsJson}
+            onChange={(e) => setCredentialsJson(e.target.value)}
+            placeholder={'{"web":{"client_id":"…","client_secret":"GOCSPX-…"}}'}
             autoComplete="off"
+            spellCheck={false}
           />
           <div className="field-hint">
-            Google refuses the code exchange for a "Web application" client without its secret (error
-            <b> invalid_request</b>). This app is client-side, so the secret lives in your device's storage
-            and is sent to Google from the browser — acceptable for a private personal app, but never make
-            the app source or this client public. A "Single-page application" client would need no secret at
-            all; if your console offers that type, prefer it and leave this empty.
+            Paste the whole client-secrets file: Google Cloud Console → Credentials → your OAuth client →
+            Download JSON. Stored only on this device and sent to Google from the browser.
           </div>
-          <Button variant="secondary" icon="check" onClick={() => void saveClientId()}>
-            Save Client ID &amp; secret
+          <Button variant="secondary" icon="check" onClick={() => void saveCredentials()}>
+            Save credentials
           </Button>
         </div>
+        {clientId.trim() && (
+          <KeyValue label="Configured client">
+            <span className="muted">{clientId}</span>
+          </KeyValue>
+        )}
         {isIosStandalone() ? (
           <div className="field-hint">
-            Home-screen app detected: this can't show Google's sign-in popup, so Connect opens sign-in in a
-            Safari tab. Finish signing in there, then return to the app — it connects automatically.
+            Home-screen app: Connect opens Google sign-in in a Safari tab — finish there, then return to the
+            app and it connects automatically.
           </div>
         ) : (
           <div className="field">
@@ -245,55 +225,6 @@ export function SettingsScreen() {
             </Select>
           </div>
         )}
-        <div className="field">
-          <label className="field-label">Authorized redirect URI</label>
-          <div className="field-hint">
-            Google rejects sign-in with <b>Error 400: redirect_uri_mismatch</b> unless this exact URL
-            (trailing slash included) is listed under the OAuth client's <b>Authorized redirect URIs</b> in
-            Google Cloud Console → Credentials → your Web application client. Popup sign-in only needs the
-            JavaScript origin; the full-page redirect and iOS home-screen flows always send this URL.
-          </div>
-          <div className="btn-row">
-            <code className="redirect-uri">{getRedirectUri()}</code>
-            <Button variant="secondary" icon="copy" onClick={() => void copyRedirectUri()}>
-              Copy
-            </Button>
-          </div>
-        </div>
-        <div className="field">
-          <label className="field-label">Sign-in debug log</label>
-          <div className="field-hint">
-            Traces the Safari-tab sign-in across restarts — useful if Connect fails silently.
-          </div>
-          <div className="btn-row">
-            <Button
-              variant="secondary"
-              icon="info"
-              onClick={() => {
-                setSignInLog(getSignInDebugLog());
-                setShowSignInLog((v) => !v);
-              }}
-            >
-              {showSignInLog ? 'Hide log' : 'Show log'}
-            </Button>
-            <Button
-              variant="secondary"
-              icon="trash"
-              onClick={() => {
-                clearSignInDebugLog();
-                setSignInLog([]);
-                toast('Sign-in log cleared', 'info');
-              }}
-            >
-              Clear
-            </Button>
-          </div>
-          {showSignInLog && (
-            <pre className="redirect-uri" style={{ whiteSpace: 'pre-wrap', marginTop: 8 }}>
-              {signInLog.length ? signInLog.join('\n') : 'No entries yet.'}
-            </pre>
-          )}
-        </div>
         <KeyValue label="Status">
           <span className={drive.status === 'ready' ? 'tone-pos' : ''}>{driveStatusLabel[drive.status] ?? drive.status}</span>
         </KeyValue>

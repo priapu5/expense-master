@@ -109,6 +109,26 @@ export async function getDriveClientSecret(): Promise<string | undefined> {
   return getSetting<string>('driveClientSecret');
 }
 
+/** Parses the client-secrets JSON that Google Cloud Console lets you download
+ *  for an OAuth client (keyed by "web" or "installed"). Returns the client ID
+ *  and secret, or undefined when the text isn't in that shape. */
+export function parseClientSecretsJson(
+  json: string,
+): { clientId: string; clientSecret?: string } | undefined {
+  try {
+    const data = JSON.parse(json) as {
+      web?: { client_id?: string; client_secret?: string };
+      installed?: { client_id?: string; client_secret?: string };
+    };
+    const section = data.web ?? data.installed;
+    const clientId = section?.client_id?.trim();
+    if (!section || !clientId) return undefined;
+    return { clientId, clientSecret: section.client_secret?.trim() || undefined };
+  } catch {
+    return undefined;
+  }
+}
+
 export async function getDriveTokens(): Promise<DriveTokens | undefined> {
   return getSetting<DriveTokens>('driveTokens');
 }
@@ -148,8 +168,8 @@ export function preloadGis(): void {
 
 const PENDING_KEY = 'drivePendingCode';
 // Append-only trace of the iOS Safari-tab sign-in, written by BOTH contexts
-// (the tab and the app). Survives app restarts, so a failed flow can be read
-// back in Settings → Google Drive → Sign-in debug log without console access.
+// (the tab and the app). Survives app restarts, so a failed flow stays
+// diagnosable without console access. Invisible to the UI.
 const DEBUG_KEY = 'driveSignInDebug';
 const DEBUG_MAX = 60;
 
@@ -163,21 +183,6 @@ function logSignIn(msg: string): void {
   }
 }
 
-export function getSignInDebugLog(): string[] {
-  try {
-    return JSON.parse(localStorage.getItem(DEBUG_KEY) ?? '[]') as string[];
-  } catch {
-    return [];
-  }
-}
-
-export function clearSignInDebugLog(): void {
-  try {
-    localStorage.removeItem(DEBUG_KEY);
-  } catch {
-    /* ignore */
-  }
-}
 // The Safari tab writes the reason here when the sign-in flow breaks there
 // (exchange error, or the redirect never carried a code). The PWA's poller
 // reads it and fails fast with a real message instead of a silent 10-minute
@@ -432,7 +437,7 @@ export async function handleOAuthCodeReturn(): Promise<boolean> {
     if (!res.ok || !data?.access_token) {
       const hint =
         data?.error === 'invalid_request'
-          ? ' This usually means the OAuth client is a "Web application" type, which requires a client secret at the code exchange. Paste the client secret in Settings → Google Drive → Save, then Connect again — or create a "Single-page application" client (no secret needed).'
+          ? ' This usually means the OAuth client is a "Web application" type, which requires a client secret at the code exchange. Paste your client-secrets file in Settings → Google Drive → Save, then Connect again — or create a "Single-page application" client (no secret needed).'
           : '';
       throw new DriveError(
         `${data?.error ? `Google sign-in failed (${data.error}).` : `Google sign-in failed (${res.status}).`}${hint}`,
