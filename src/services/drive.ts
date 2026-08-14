@@ -167,21 +167,6 @@ export function preloadGis(): void {
 // read the resulting token from storage shared between Safari and the PWA.
 
 const PENDING_KEY = 'drivePendingCode';
-// Append-only trace of the iOS Safari-tab sign-in, written by BOTH contexts
-// (the tab and the app). Survives app restarts, so a failed flow stays
-// diagnosable without console access. Invisible to the UI.
-const DEBUG_KEY = 'driveSignInDebug';
-const DEBUG_MAX = 60;
-
-function logSignIn(msg: string): void {
-  try {
-    const cur = JSON.parse(localStorage.getItem(DEBUG_KEY) ?? '[]') as string[];
-    cur.push(`${new Date().toLocaleTimeString()} — ${msg}`);
-    localStorage.setItem(DEBUG_KEY, JSON.stringify(cur.slice(-DEBUG_MAX)));
-  } catch {
-    /* storage unavailable — ignore */
-  }
-}
 
 // The Safari tab writes the reason here when the sign-in flow breaks there
 // (exchange error, or the redirect never carried a code). The PWA's poller
@@ -253,7 +238,6 @@ function startManualSignInSync(clientId: string): void {
   localStorage.removeItem(PENDING_ERROR_KEY); // clear any stale failure from a previous attempt
   localStorage.removeItem(PENDING_DONE_KEY);
   const redirectUri = getRedirectUri();
-  logSignIn(`opened Safari tab (redirect ${redirectUri})`);
   const pair = challengePool.shift();
   void refillChallengePool();
   const verifier = pair?.verifier ?? randomBase64Url(64);
@@ -307,7 +291,6 @@ export function startManualSignInIfStandalone(): boolean {
  *  The tab is already open — this only polls and clears the flag. */
 async function requestTokenManual(timeoutMs = 5 * 60_000): Promise<{ accessToken: string; expiresAt: number }> {
   const start = Date.now();
-  logSignIn('polling for Safari-tab token');
   for (;;) {
     await new Promise((r) => setTimeout(r, 750));
     // The Safari tab records its failure here; surface it immediately rather
@@ -316,20 +299,17 @@ async function requestTokenManual(timeoutMs = 5 * 60_000): Promise<{ accessToken
     if (tabError) {
       localStorage.removeItem(PENDING_ERROR_KEY);
       manualSignInStarted = false;
-      logSignIn(`tab reported failure: ${tabError}`);
       throw new DriveError(tabError, 'popup');
     }
     const tokens = await getDriveTokens();
     if (tokens && tokens.expiresAt - Date.now() > TOKEN_SKEW_MS) {
       localStorage.removeItem(PENDING_DONE_KEY);
       manualSignInStarted = false;
-      logSignIn('token found in storage');
       return { accessToken: tokens.accessToken, expiresAt: tokens.expiresAt };
     }
     if (localStorage.getItem(PENDING_DONE_KEY)) {
       localStorage.removeItem(PENDING_DONE_KEY);
       manualSignInStarted = false;
-      logSignIn('done marker set but token invisible — storage not shared?');
       throw new DriveError(
         'Sign-in completed in Safari, but the app could not read the token from Safari\'s storage. Close and reopen the app, then tap Connect again.',
         'popup',
@@ -337,12 +317,10 @@ async function requestTokenManual(timeoutMs = 5 * 60_000): Promise<{ accessToken
     }
     if (!localStorage.getItem(PENDING_KEY)) {
       manualSignInStarted = false;
-      logSignIn('pending removed without token — cancelled');
       throw new DriveError('Google sign-in was cancelled in Safari.', 'auth');
     }
     if (Date.now() - start > timeoutMs) {
       manualSignInStarted = false;
-      logSignIn(`timed out after ${Math.round(timeoutMs / 1000)}s`);
       throw new DriveError('Sign-in in Safari did not complete. Tap Connect to try again.', 'popup');
     }
   }
@@ -370,12 +348,10 @@ export async function maybeResumePendingSignIn(timeoutMs = 60_000): Promise<stri
     return null;
   }
   manualSignInStarted = true;
-  logSignIn('resuming pending Safari sign-in after restart');
   try {
     await requestTokenManual(timeoutMs);
     return 'connected';
   } catch (err) {
-    logSignIn(`resumed sign-in failed: ${err instanceof Error ? err.message : String(err)}`);
     return err instanceof DriveError && err.kind === 'auth' ? 'cancelled' : err instanceof Error ? err.message : String(err);
   } finally {
     manualSignInStarted = false;
@@ -398,7 +374,6 @@ export async function handleOAuthCodeReturn(): Promise<boolean> {
     const msg = error
       ? `Google sign-in was not completed (${error}). Tap Connect to try again.`
       : 'The sign-in was interrupted before Google could return a code — a login page (such as GitHub\'s) probably intercepted the redirect. Tap Connect to try again.';
-    logSignIn(`page load without code (${error ?? 'no error'}) — recording interrupted`);
     localStorage.setItem(PENDING_ERROR_KEY, msg);
     console.warn('[drive] manual sign-in interrupted:', error ?? 'code lost');
     localStorage.removeItem(PENDING_KEY);
@@ -407,12 +382,10 @@ export async function handleOAuthCodeReturn(): Promise<boolean> {
   }
   if (!rawPending) {
     console.warn('[drive] manual sign-in code arrived without pending state');
-    logSignIn('code received but no pending state');
     localStorage.setItem(PENDING_ERROR_KEY, 'Google returned a sign-in code, but no sign-in was in progress. Tap Connect to try again.');
     clearUrl();
     return false;
   }
-  logSignIn('code received, exchanging');
   const pending = JSON.parse(rawPending) as PendingCode;
   try {
     const secret = await getDriveClientSecret();
@@ -450,14 +423,12 @@ export async function handleOAuthCodeReturn(): Promise<boolean> {
       expiresAt: Date.now() + (data.expires_in ?? 3600) * 1000,
       account,
     } satisfies DriveTokens);
-    logSignIn('token saved — returning to app');
     localStorage.setItem(PENDING_DONE_KEY, String(Date.now()));
     localStorage.removeItem(PENDING_KEY);
     localStorage.removeItem(PENDING_ERROR_KEY);
     clearUrl();
     return true;
   } catch (err) {
-    logSignIn(`exchange failed: ${err instanceof Error ? err.message : String(err)}`);
     localStorage.setItem(PENDING_ERROR_KEY, `Google sign-in failed: ${err instanceof Error ? err.message : String(err)}`);
     localStorage.removeItem(PENDING_KEY);
     clearUrl();
