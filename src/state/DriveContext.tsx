@@ -51,11 +51,11 @@ export function DriveProvider({ children }: { children: ReactNode }) {
       ? 'needsReconnect'
       : statusMessage === 'error'
         ? 'error'
-        : hasToken
-          ? statusMessage === 'connecting'
-            ? 'connecting'
-            : 'ready'
-          : 'signedOut';
+        : statusMessage === 'connecting'
+          ? 'connecting' // includes the no-token-yet Safari-tab wait
+          : hasToken
+            ? 'ready'
+            : 'signedOut';
 
   const pendingCount = useMemo(
     () => appData.transactions.filter((t) => t.receipt && t.receipt.syncState !== 'synced').length,

@@ -46,9 +46,11 @@ The app uses Google's official popup sign-in (Google Identity Services) with the
 5. Under **Authorized JavaScript origins** add:
    - `http://localhost:5173` (for local development)
    - your deployed origin, e.g. `https://<your-username>.github.io`
-   Under **Authorized redirect URIs** (needed if you use full-page redirect sign-in) add:
+   Under **Authorized redirect URIs** (needed for full-page redirect sign-in and the iOS home-screen flow) add:
    - `http://localhost:5173/`
    - your app's full page URL, e.g. `https://<your-username>.github.io/expense-tracker/` (exact match, including the trailing slash)
+
+   The exact string to register is shown in **Settings → Google Drive → Authorized redirect URI** — copy it from there rather than guessing. If your Pages site is private, GitHub publishes it under a random subdomain like `musical-umbrella-xxxx.pages.github.io` — register *that* URL, not `<you>.github.io`.
 6. Copy the **Client ID** → app **Settings → Google Drive** → paste → Save → **Connect**.
 
 No client secret is needed — the app never asks for one.
@@ -65,6 +67,11 @@ iOS requires **HTTPS** for service workers, the camera, and Google sign-in, so `
    ```
 2. In the repo: **Settings → Pages → Source: GitHub Actions** (a workflow is included in `.github/workflows/deploy-pages.yml`).
 3. Your app is at `https://<you>.github.io/expense-tracker/`. Add that origin — and, for full-page redirect sign-in, the full page URL as an authorized redirect URI — to the OAuth client from step 2.
+
+   **If the repo is private**, GitHub publishes the site on a random, stable subdomain (e.g. `musical-umbrella-xxxx.pages.github.io`, shown in **Settings → Pages**) and puts it behind **GitHub's own login**. That login wall breaks Google sign-in and the PWA on a fresh browser session (the OAuth redirect back to the app lands on a GitHub sign-in page, swallowing the code), so prefer one of:
+   - **Publish the Pages site publicly** (Settings → Pages → visibility → Public) — clean `https://<you>.github.io/expense-tracker/` URL, no login wall, source repo stays private.
+   - Or host `dist/` on **Netlify** or **Cloudflare Pages** — free, static, HTTPS, no auth wall.
+   If you must stay private with the random subdomain, it *is* stable across deploys (it only changes if you flip the site's visibility), so registering it in Google works — but expect sign-in to fail whenever the GitHub session in Safari expires.
 4. **iPhone**: open the URL in Safari → **Share → Add to Home Screen**. Now it behaves like a real app — and installed apps are exempt from iOS's 7-day website-data cleanup.
 
 (Netlify also works: drag the `dist/` folder onto app.netlify.com/drop — no workflow needed. Or run `npm run preview` on your Mac and open `http://<your-mac-ip>:4173` from the phone for basic testing — but without HTTPS the install/SW/camera/GIS pieces won't fully work.)
@@ -89,6 +96,7 @@ iOS requires **HTTPS** for service workers, the camera, and Google sign-in, so `
 ## Troubleshooting
 
 - **"Access blocked … Error 400: redirect_uri_mismatch"** when signing in → the redirect URI the app sent isn't registered on your OAuth client. Copy the **Authorized redirect URI** shown in **Settings → Google Drive** and paste it into Google Cloud Console → your Web application client → **Authorized redirect URIs** (exact match, including the trailing slash — Google requires the scheme, host, and trailing slash to match exactly). This is always required for the full-page redirect and iOS home-screen flows; popup sign-in only needs the authorized JavaScript origin.
+- **Google consent completed, but the app still says "Configured, but not signed in"** → the token never made it back from the Safari tab. Check what the tab shows after you grant permission: if it's a **GitHub sign-in page** (private-Pages sites sit behind GitHub's login, which drops the `?code=`), the exchange can't happen — publish the Pages site publicly or move to Netlify/Cloudflare Pages. The app now surfaces the exact reason as an error toast instead of waiting silently; the status shows **Connecting…** while the Safari tab flow is in progress.
 - **"The Google sign-in popup was blocked"** → Settings → Google Drive → switch sign-in method to **Full-page redirect**.
 - **Sign-in on the iPhone home-screen app** → Connect opens a Safari tab (home-screen apps can't show Google's popup). Finish signing in there, then return to the app — it connects automatically.
 - **429 / "Free-tier rate limit"** while scanning → wait a minute; the free tier allows roughly 1,500 requests/day.

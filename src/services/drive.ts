@@ -139,6 +139,11 @@ export function preloadGis(): void {
 // read the resulting token from storage shared between Safari and the PWA.
 
 const PENDING_KEY = 'drivePendingCode';
+// The Safari tab writes the reason here when the sign-in flow breaks there
+// (exchange error, or the redirect never carried a code). The PWA's poller
+// reads it and fails fast with a real message instead of a silent 10-minute
+// wait. localStorage is shared between Safari and the home-screen app on iOS.
+const PENDING_ERROR_KEY = 'drivePendingError';
 
 interface PendingCode {
   verifier: string;
@@ -196,6 +201,7 @@ async function refillChallengePool(): Promise<void> {
 /** Opens Google's consent page in a Safari tab and stores the PKCE verifier.
  *  localStorage is synchronous, so the whole click path stays in-gesture. */
 function startManualSignInSync(clientId: string): void {
+  localStorage.removeItem(PENDING_ERROR_KEY); // clear any stale failure from a previous attempt
   const redirectUri = getRedirectUri();
   const pair = challengePool.shift();
   void refillChallengePool();
@@ -252,6 +258,14 @@ async function requestTokenManual(): Promise<{ accessToken: string; expiresAt: n
   const start = Date.now();
   for (;;) {
     await new Promise((r) => setTimeout(r, 750));
+    // The Safari tab records its failure here; surface it immediately rather
+    // than polling until the timeout. (kind 'popup' so Connect shows the toast.)
+    const tabError = localStorage.getItem(PENDING_ERROR_KEY);
+    if (tabError) {
+      localStorage.removeItem(PENDING_ERROR_KEY);
+      manualSignInStarted = false;
+      throw new DriveError(tabError, 'popup');
+    }
     const tokens = await getDriveTokens();
     if (tokens && tokens.expiresAt - Date.now() > TOKEN_SKEW_MS) {
       manualSignInStarted = false;
@@ -277,14 +291,24 @@ export async function handleOAuthCodeReturn(): Promise<boolean> {
   const rawPending = localStorage.getItem(PENDING_KEY);
   const clearUrl = () => history.replaceState(null, '', window.location.pathname);
   if (!code) {
-    if (!error) return false; // no OAuth response on this URL
-    console.warn('[drive] manual sign-in returned error:', error);
+    if (!error && !rawPending) return false; // no OAuth response on this URL
+    // The sign-in redirect was supposed to land here with a ?code= but didn't
+    // — typically a login wall (e.g. GitHub's private-pages auth) intercepted
+    // the redirect and dropped the query string. Tell the PWA's poller.
+    localStorage.setItem(
+      PENDING_ERROR_KEY,
+      error
+        ? `Google sign-in was not completed (${error}). Tap Connect to try again.`
+        : 'The sign-in was interrupted before Google could return a code — a login page (such as GitHub\'s) probably intercepted the redirect. Tap Connect to try again.',
+    );
+    console.warn('[drive] manual sign-in interrupted:', error ?? 'code lost');
     localStorage.removeItem(PENDING_KEY);
     clearUrl();
     return false;
   }
   if (!rawPending) {
     console.warn('[drive] manual sign-in code arrived without pending state');
+    localStorage.setItem(PENDING_ERROR_KEY, 'Google returned a sign-in code, but no sign-in was in progress. Tap Connect to try again.');
     clearUrl();
     return false;
   }
@@ -320,9 +344,11 @@ export async function handleOAuthCodeReturn(): Promise<boolean> {
       account,
     } satisfies DriveTokens);
     localStorage.removeItem(PENDING_KEY);
+    localStorage.removeItem(PENDING_ERROR_KEY);
     clearUrl();
     return true;
   } catch (err) {
+    localStorage.setItem(PENDING_ERROR_KEY, `Google sign-in failed: ${err instanceof Error ? err.message : String(err)}`);
     localStorage.removeItem(PENDING_KEY);
     clearUrl();
     throw err;
