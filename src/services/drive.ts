@@ -144,6 +144,11 @@ const PENDING_KEY = 'drivePendingCode';
 // reads it and fails fast with a real message instead of a silent 10-minute
 // wait. localStorage is shared between Safari and the home-screen app on iOS.
 const PENDING_ERROR_KEY = 'drivePendingError';
+// Set by the Safari tab right after it saves the token. If the PWA's poller
+// sees this without being able to read the token itself, the tab's storage
+// isn't shared with the app (indexedDB vs localStorage isolation) — a
+// distinct failure worth reporting instead of a silent timeout.
+const PENDING_DONE_KEY = 'drivePendingDone';
 
 interface PendingCode {
   verifier: string;
@@ -202,6 +207,7 @@ async function refillChallengePool(): Promise<void> {
  *  localStorage is synchronous, so the whole click path stays in-gesture. */
 function startManualSignInSync(clientId: string): void {
   localStorage.removeItem(PENDING_ERROR_KEY); // clear any stale failure from a previous attempt
+  localStorage.removeItem(PENDING_DONE_KEY);
   const redirectUri = getRedirectUri();
   const pair = challengePool.shift();
   void refillChallengePool();
@@ -268,8 +274,17 @@ async function requestTokenManual(): Promise<{ accessToken: string; expiresAt: n
     }
     const tokens = await getDriveTokens();
     if (tokens && tokens.expiresAt - Date.now() > TOKEN_SKEW_MS) {
+      localStorage.removeItem(PENDING_DONE_KEY);
       manualSignInStarted = false;
       return { accessToken: tokens.accessToken, expiresAt: tokens.expiresAt };
+    }
+    if (localStorage.getItem(PENDING_DONE_KEY)) {
+      localStorage.removeItem(PENDING_DONE_KEY);
+      manualSignInStarted = false;
+      throw new DriveError(
+        'Sign-in completed in Safari, but the app could not read the token from Safari\'s storage. Close and reopen the app, then tap Connect again.',
+        'popup',
+      );
     }
     if (!localStorage.getItem(PENDING_KEY)) {
       manualSignInStarted = false;
@@ -343,6 +358,7 @@ export async function handleOAuthCodeReturn(): Promise<boolean> {
       expiresAt: Date.now() + (data.expires_in ?? 3600) * 1000,
       account,
     } satisfies DriveTokens);
+    localStorage.setItem(PENDING_DONE_KEY, String(Date.now()));
     localStorage.removeItem(PENDING_KEY);
     localStorage.removeItem(PENDING_ERROR_KEY);
     clearUrl();
