@@ -9,7 +9,15 @@
  * Receipt photos never go into Cache Storage (iOS caps it at ~50 MB); they live
  * in IndexedDB and Google Drive.
  */
-const VERSION = 'expense-tracker-v3';
+// The COMMIT placeholder in the VERSION constant below is replaced at build
+// time with the git SHA (see scripts/precache-manifest.mjs, which generates
+// this file into dist/). A unique cache name per deploy forces the browser's
+// update check to notice the new service worker, re-read the precache
+// manifest, and
+// swap in the new hashed assets — a byte-identical sw.js would never trigger
+// a reinstall, and iOS standalone apps would keep serving the old cached
+// shell indefinitely.
+const VERSION = 'expense-tracker-v3-__COMMIT__';
 const PRECACHE_URL = './precache-manifest.json';
 
 self.addEventListener('install', (event) => {
