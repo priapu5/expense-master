@@ -5,7 +5,14 @@ import { useToast } from '../../state/ToastContext';
 import { useConfirm } from '../../state/ConfirmContext';
 import { exportAll } from '../../db/repos';
 import { clearFxCache, fxCacheSize } from '../../services/fx';
-import { getRedirectUri, isIosStandalone, listBackups, type DriveBackupMeta } from '../../services/drive';
+import {
+  clearSignInDebugLog,
+  getRedirectUri,
+  getSignInDebugLog,
+  isIosStandalone,
+  listBackups,
+  type DriveBackupMeta,
+} from '../../services/drive';
 import { getStorageInfo, requestPersist, bytesLabel } from '../../lib/storage';
 import { shareOrDownload } from '../../lib/download';
 import { CURRENCIES } from '../../lib/currency';
@@ -30,6 +37,8 @@ export function SettingsScreen() {
   });
   const [fxCount, setFxCount] = useState(0);
   const [restoreOpen, setRestoreOpen] = useState(false);
+  const [showSignInLog, setShowSignInLog] = useState(false);
+  const [signInLog, setSignInLog] = useState<string[]>([]);
 
   useEffect(() => {
     getStorageInfo().then(setStorage).catch(() => undefined);
@@ -230,6 +239,40 @@ export function SettingsScreen() {
               Copy
             </Button>
           </div>
+        </div>
+        <div className="field">
+          <label className="field-label">Sign-in debug log</label>
+          <div className="field-hint">
+            Traces the Safari-tab sign-in across restarts — useful if Connect fails silently.
+          </div>
+          <div className="btn-row">
+            <Button
+              variant="secondary"
+              icon="info"
+              onClick={() => {
+                setSignInLog(getSignInDebugLog());
+                setShowSignInLog((v) => !v);
+              }}
+            >
+              {showSignInLog ? 'Hide log' : 'Show log'}
+            </Button>
+            <Button
+              variant="secondary"
+              icon="trash"
+              onClick={() => {
+                clearSignInDebugLog();
+                setSignInLog([]);
+                toast('Sign-in log cleared', 'info');
+              }}
+            >
+              Clear
+            </Button>
+          </div>
+          {showSignInLog && (
+            <pre className="redirect-uri" style={{ whiteSpace: 'pre-wrap', marginTop: 8 }}>
+              {signInLog.length ? signInLog.join('\n') : 'No entries yet.'}
+            </pre>
+          )}
         </div>
         <KeyValue label="Status">
           <span className={drive.status === 'ready' ? 'tone-pos' : ''}>{driveStatusLabel[drive.status] ?? drive.status}</span>

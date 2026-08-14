@@ -83,6 +83,20 @@ export function DriveProvider({ children }: { children: ReactNode }) {
         if (found) toast('Signed in — you can now return to the app', 'success');
       })
       .catch(() => undefined);
+    // iOS may have killed the app while the consent tab was open, taking the
+    // original poller with it — resume the pending sign-in on this fresh boot.
+    drive
+      .maybeResumePendingSignIn()
+      .then((outcome) => {
+        if (!outcome) return;
+        if (outcome === 'connected') {
+          void reload();
+          toast('Connected to Google Drive', 'success');
+        } else if (outcome !== 'cancelled') {
+          toast(outcome, 'error');
+        }
+      })
+      .catch(() => undefined);
     // Any record stuck in 'uploading' from a crashed session goes back to 'local'.
     for (const t of appData.transactions) {
       if (t.receipt?.syncState === 'uploading') {
@@ -103,10 +117,24 @@ export function DriveProvider({ children }: { children: ReactNode }) {
   }, [settingsLoaded, clientId, settings['driveSignInMode']]);
 
   // The iOS home-screen flow signs in inside a Safari tab; when the user
-  // comes back to the app, re-read settings so the token saved there shows up.
+  // comes back to the app, re-read settings so the token saved there shows up
+  // — and resume the poll if the app was restarted mid-flow.
   useEffect(() => {
     const onVisible = () => {
-      if (document.visibilityState === 'visible') void reload();
+      if (document.visibilityState !== 'visible') return;
+      void reload();
+      void drive
+        .maybeResumePendingSignIn(30_000)
+        .then((outcome) => {
+          if (!outcome) return;
+          if (outcome === 'connected') {
+            void reload();
+            toast('Connected to Google Drive', 'success');
+          } else if (outcome !== 'cancelled') {
+            toast(outcome, 'error');
+          }
+        })
+        .catch(() => undefined);
     };
     document.addEventListener('visibilitychange', onVisible);
     window.addEventListener('focus', onVisible);
@@ -114,7 +142,7 @@ export function DriveProvider({ children }: { children: ReactNode }) {
       document.removeEventListener('visibilitychange', onVisible);
       window.removeEventListener('focus', onVisible);
     };
-  }, [reload]);
+  }, [reload, toast]);
 
   const connect = useCallback(async () => {
     setStatusMessage('connecting');
