@@ -343,7 +343,9 @@ export function SettingsScreen() {
         <h2 className="settings-heading">
           <Icon paths={[...ICONS.info]} size={18} /> About
         </h2>
-        <KeyValue label="Version">{__APP_VERSION__}</KeyValue>
+        <KeyValue label="Version">
+          {__APP_VERSION__} <span className="muted">({__APP_COMMIT__})</span>
+        </KeyValue>
         <KeyValue label="Build date">{__APP_BUILD_DATE__}</KeyValue>
       </section>
 
