@@ -42,7 +42,7 @@ The app uses Google's official popup sign-in (Google Identity Services) with the
 1. [Google Cloud Console](https://console.cloud.google.com) → create a project.
 2. **APIs & Services → Library** → enable **Google Drive API**.
 3. **APIs & Services → OAuth consent screen** → External → fill in the app name and your email → **Add scopes**: `https://www.googleapis.com/auth/drive.file` → **Add yourself as a test user** (no Google review needed).
-4. **APIs & Services → Credentials → Create credentials → OAuth client ID → Web application**.
+4. **APIs & Services → Credentials → Create credentials → OAuth client ID → Single-page application** (not "Web application" — that type is a confidential client whose secret Google requires at the code exchange, and this app never sends a secret, so sign-in would fail with `invalid_request`).
 5. Under **Authorized JavaScript origins** add:
    - `http://localhost:5173` (for local development)
    - your deployed origin, e.g. `https://<your-username>.github.io`
@@ -96,7 +96,8 @@ iOS requires **HTTPS** for service workers, the camera, and Google sign-in, so `
 ## Troubleshooting
 
 - **"Access blocked … Error 400: redirect_uri_mismatch"** when signing in → the redirect URI the app sent isn't registered on your OAuth client. Copy the **Authorized redirect URI** shown in **Settings → Google Drive** and paste it into Google Cloud Console → your Web application client → **Authorized redirect URIs** (exact match, including the trailing slash — Google requires the scheme, host, and trailing slash to match exactly). This is always required for the full-page redirect and iOS home-screen flows; popup sign-in only needs the authorized JavaScript origin.
-- **Google consent completed, but the app still says "Configured, but not signed in"** → the token never made it back from the Safari tab. Check what the tab shows after you grant permission: if it's a **GitHub sign-in page** (private-Pages sites sit behind GitHub's login, which drops the `?code=`), the exchange can't happen — publish the Pages site publicly or move to Netlify/Cloudflare Pages. The app now surfaces the exact reason as an error toast instead of waiting silently; the status shows **Connecting…** while the Safari tab flow is in progress.
+- **"Google sign-in failed (invalid_request)"** → your OAuth client is type **"Web application"**, which requires a client secret at the code exchange (PKCE doesn't substitute). Create a **"Single-page application"** client in Google Cloud Console (Credentials → Create credentials → OAuth client ID), copy its Client ID into the app, and Connect again.
+- **Google consent completed, but the app still says "Configured, but not signed in"** → the token never made it back from the Safari tab. Check **Settings → Google Drive → Sign-in debug log** for the exact step that failed. If the GitHub sign-in page intercepted the redirect, publish the Pages site publicly or move to Netlify/Cloudflare Pages. The status shows **Connecting…** while the Safari tab flow is in progress.
 - **"The Google sign-in popup was blocked"** → Settings → Google Drive → switch sign-in method to **Full-page redirect**.
 - **Sign-in on the iPhone home-screen app** → Connect opens a Safari tab (home-screen apps can't show Google's popup). Finish signing in there, then return to the app — it connects automatically.
 - **429 / "Free-tier rate limit"** while scanning → wait a minute; the free tier allows roughly 1,500 requests/day.

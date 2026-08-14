@@ -420,8 +420,12 @@ export async function handleOAuthCodeReturn(): Promise<boolean> {
       error?: string;
     } | null;
     if (!res.ok || !data?.access_token) {
+      const hint =
+        data?.error === 'invalid_request'
+          ? ' This usually means the OAuth client is a "Web application" type, which requires a client secret the app never sends. Create a "Single-page application" client in Google Cloud Console (Credentials → Create credentials → OAuth client ID) and paste its Client ID in Settings instead.'
+          : '';
       throw new DriveError(
-        data?.error ? `Google sign-in failed (${data.error}).` : `Google sign-in failed (${res.status}).`,
+        `${data?.error ? `Google sign-in failed (${data.error}).` : `Google sign-in failed (${res.status}).`}${hint}`,
         'auth',
       );
     }
