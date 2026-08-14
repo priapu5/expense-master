@@ -903,6 +903,14 @@ html.letterboxed .btn-row-sticky {
   color: var(--text2);
   padding: 8px 4px;
 }
+.sync-note-error {
+  color: var(--danger);
+  background: rgba(255, 59, 48, 0.08);
+  border: 1px solid rgba(255, 59, 48, 0.25);
+  border-radius: 12px;
+  padding: 10px 12px;
+  margin: 6px 0;
+}
 .kv-list {
   margin: 8px 0;
 }

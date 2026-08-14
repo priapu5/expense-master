@@ -72,7 +72,9 @@ export function DriveProvider({ children }: { children: ReactNode }) {
     drive
       .handleRedirectToken()
       .then((found) => {
-        if (found) toast('Signed in to Google Drive', 'success');
+        if (!found) return;
+        void reload(); // token saved by the service directly — re-read so the UI reflects it
+        toast('Signed in to Google Drive', 'success');
       })
       .catch(() => undefined);
     // iOS home-screen flow: the Safari tab lands here with ?code= — exchange
@@ -175,9 +177,31 @@ export function DriveProvider({ children }: { children: ReactNode }) {
 
   const disconnect = useCallback(async () => {
     await drive.disconnectDrive();
+    // disconnectDrive clears the token in storage directly — re-read settings
+    // so the in-memory copy is dropped and the UI switches to signed-out now,
+    // instead of only after an app restart.
+    await reload();
     setStatusMessage(null);
     toast('Disconnected from Google Drive. Local data is untouched.', 'info');
-  }, [toast]);
+  }, [reload, toast]);
+
+  /** A Drive auth failure (expired/revoked session) means the connection is
+   *  gone. Flip the whole app into "needs reconnection" and re-read settings:
+   *  the 401 handler may already have cleared the token from storage, so the
+   *  stale in-memory copy must be dropped for the status to change. */
+  const markAuthFailure = useCallback(() => {
+    setStatusMessage('needsReconnect');
+    void reload();
+  }, [reload]);
+
+  /** Background operations (auto-backup) must not open popups or spam toasts;
+   *  still surface an auth failure so the app offers to reconnect. */
+  const handleBackgroundFailure = useCallback(
+    (err: unknown) => {
+      if (err instanceof drive.DriveError && err.kind === 'auth') markAuthFailure();
+    },
+    [markAuthFailure],
+  );
 
   const syncNowInternal = useCallback(async () => {
     if (syncBusy.current) return;
@@ -187,6 +211,7 @@ export function DriveProvider({ children }: { children: ReactNode }) {
       const pending = appData.transactions.filter(
         (t) => t.receipt && t.receipt.blobData && t.receipt.syncState !== 'synced',
       );
+      let authStopped = false;
       for (const t of pending) {
         const company = appData.companyById.get(appData.projectById.get(t.projectId)?.companyId ?? '');
         if (!company) continue;
@@ -223,21 +248,26 @@ export function DriveProvider({ children }: { children: ReactNode }) {
           });
           setLastSyncError(errMessage(err));
           if (e && (e.kind === 'auth' || e.kind === 'popup' || e.kind === 'unconfigured')) {
-            if (e.kind === 'auth') setStatusMessage('needsReconnect');
+            if (e.kind === 'auth') {
+              markAuthFailure();
+              authStopped = true;
+              toast(errMessage(err), 'error');
+            }
             break;
           }
           if (e?.kind === 'quota') break;
         }
       }
       if (pending.length > 0) {
-        setStatusMessage(null);
+        // Don't clobber the needsReconnect state set above for an auth failure.
+        if (!authStopped) setStatusMessage(null);
         const remaining = appData.transactions.filter((t) => t.receipt && t.receipt.syncState !== 'synced').length;
         if (remaining === 0) toast('All receipts synced to Google Drive', 'success');
       }
     } finally {
       syncBusy.current = false;
     }
-  }, [appData]);
+  }, [appData, markAuthFailure, toast]);
 
   const syncNow = useCallback(async () => {
     setLastSyncError(null);
@@ -268,10 +298,11 @@ export function DriveProvider({ children }: { children: ReactNode }) {
       toast('Backup saved to Google Drive', 'success');
     } catch (err) {
       const e = err instanceof drive.DriveError ? err : null;
+      if (e?.kind === 'auth') markAuthFailure();
       if (e?.kind === 'popup') toast(errMessage(err), 'error');
       else toast(`Backup failed: ${errMessage(err)}`, 'error');
     }
-  }, [backupNowInternal, toast]);
+  }, [backupNowInternal, markAuthFailure, toast]);
 
   /** Debounced auto-backup; only runs with a still-valid token (no popups in
    *  the background — popup blockers would kill it). */
@@ -282,17 +313,17 @@ export function DriveProvider({ children }: { children: ReactNode }) {
       const validToken = await drive.getCachedTokenIfValid();
       if (!validToken) return; // skip silently; next manual backup/sync refreshes
       if (immediate) {
-        await backupNowInternal().catch(() => undefined);
+        await backupNowInternal().catch(handleBackgroundFailure);
         return;
       }
       dirtyRef.current = true;
       if (backupTimer.current != null) window.clearTimeout(backupTimer.current);
       backupTimer.current = window.setTimeout(() => {
         backupTimer.current = null;
-        if (dirtyRef.current) void backupNowInternal().catch(() => undefined);
+        if (dirtyRef.current) void backupNowInternal().catch(handleBackgroundFailure);
       }, 60_000);
     },
-    [settings, backupNowInternal],
+    [settings, backupNowInternal, handleBackgroundFailure],
   );
 
   // Auto-backup trigger: any data mutation.

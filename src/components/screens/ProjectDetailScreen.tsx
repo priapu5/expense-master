@@ -155,16 +155,26 @@ export function ProjectDetailScreen({
           );
         })
       )}
-      {drive.pendingCount > 0 && (
-        <div className="sync-note">
-          <Icon paths={[...ICONS.cloudOff]} size={16} />
-          {drive.pendingCount} receipt(s) not yet in Google Drive
-          {drive.status === 'ready' && (
-            <Button variant="ghost" icon="refresh" onClick={() => void drive.syncNow()}>
-              Sync now
-            </Button>
-          )}
+      {drive.status === 'needsReconnect' ? (
+        <div className="sync-note sync-note-error">
+          <Icon paths={[...ICONS.alert]} size={16} />
+          <span>Google Drive session expired — sign in again to keep syncing.</span>
+          <Button variant="ghost" icon="drive" onClick={() => void drive.connect()}>
+            Reconnect
+          </Button>
         </div>
+      ) : (
+        drive.pendingCount > 0 && (
+          <div className="sync-note">
+            <Icon paths={[...ICONS.cloudOff]} size={16} />
+            {drive.pendingCount} receipt(s) not yet in Google Drive
+            {drive.status === 'ready' && (
+              <Button variant="ghost" icon="refresh" onClick={() => void drive.syncNow()}>
+                Sync now
+              </Button>
+            )}
+          </div>
+        )
       )}
 
       {addMenu && (
